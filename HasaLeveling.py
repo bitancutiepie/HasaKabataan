@@ -5,6 +5,7 @@ import os
 import pygame
 import json
 import mysql.connector
+import webbrowser # ADDED: For opening YouTube links
 
 # --- GLOBAL CONSTANTS ---
 ASSETS_DIR = "assets"
@@ -28,15 +29,72 @@ LANDSCAPE_SLIDER_X = LANDSCAPE_WIDTH - LANDSCAPE_SLIDER_WIDTH - 110
 LANDSCAPE_SLIDER_Y = 700 
 
 # --- AVATAR & USERNAME TEXT CONSTANTS (For Frame 3) ---
+# --- AVATAR CONSTANTS ---
 AVATAR_CENTER_X = 1080  
 AVATAR_CENTER_Y = 130 
 
+# --- USERNAME TEXT CONSTANTS ---
 USERNAME_TEXT_X = 350
 USER_NAME_TEXT_Y = 125
 
 # Avatar Dimensions for Individual Scaling
 MALE_AVATAR_DIMS = (560, 315)
 FEMALE_AVATAR_DIMS = (522, 273) 
+
+# --- TUTORIAL FRAME ICON CONSTANTS (UPDATED) ---
+TUTORIAL_ICON_X = 240  # The X-coordinate for the tutorial icon
+TUTORIAL_ICON_Y = 455 
+TUTORIAL_ICON_DIMS = (160, 203) # Dimensions for the tutorial icons
+
+# --- TUTORIAL YOUTUBE LINKS (NEW SECTION) ---
+# IMPORTANT: Replace the placeholder URLs with actual YouTube tutorial links
+TUTORIAL_LINKS = {
+    "Python": {
+        1: "https://www.youtube.com/watch?v=python_link_1", 
+        2: "https://www.youtube.com/watch?v=python_link_2",
+        3: "https://www.youtube.com/watch?v=python_link_3",
+        4: "https://www.youtube.com/watch?v=python_link_4",
+        5: "https://www.youtube.com/watch?v=python_link_5"
+    },
+    "Java": {
+        1: "https://www.youtube.com/watch?v=java_link_1", 
+        2: "https://www.youtube.com/watch?v=java_link_2",
+        3: "https://www.youtube.com/watch?v=java_link_3",
+        4: "https://www.youtube.com/watch?v=java_link_4",
+        5: "https://www.youtube.com/watch?v=java_link_5"
+    },
+    "HTML": {
+        1: "https://www.youtube.com/watch?v=html_link_1", 
+        2: "https://www.youtube.com/watch?v=html_link_2",
+        3: "https://www.youtube.com/watch?v=html_link_3",
+        4: "https://www.youtube.com/watch?v=html_link_4",
+        5: "https://www.youtube.com/watch?v=html_link_5"
+    },
+    "C++": {
+        1: "https://www.youtube.com/watch?v=c_plus_plus_link_1", 
+        2: "https://www.youtube.com/watch?v=c_plus_plus_link_2",
+        3: "https://www.youtube.com/watch?v=c_plus_plus_link_3",
+        4: "https://www.youtube.com/watch?v=c_plus_plus_link_4",
+        5: "https://www.youtube.com/watch?v=c_plus_plus_link_5"
+    },
+    "MySQL": {
+        1: "https://www.youtube.com/watch?v=mysql_link_1", 
+        2: "https://www.youtube.com/watch?v=mysql_link_2",
+        3: "https://www.youtube.com/watch?v=mysql_link_3",
+        4: "https://www.youtube.com/watch?v=mysql_link_4",
+        5: "https://www.youtube.com/watch?v=mysql_link_5"
+    },
+}
+
+# --- TUTORIAL PLAY BUTTON CONFIGURATION (UPDATED DIMENSIONS) ---
+PLAY_BUTTONS_DIMS = (19.5, 24.3) # Updated dimensions: 19.5px width and 24.3 height for all
+PLAY_BUTTONS_CONFIG = [
+    {"tag": "play1_btn", "path": "play1.png", "dims": PLAY_BUTTONS_DIMS, "coords": (515, 419), "button_num": 1},
+    {"tag": "play2_btn", "path": "play2.png", "dims": PLAY_BUTTONS_DIMS, "coords": (772, 419), "button_num": 2},
+    {"tag": "play3_btn", "path": "play3.png", "dims": PLAY_BUTTONS_DIMS, "coords": (1030, 419), "button_num": 3},
+    {"tag": "play4_btn", "path": "play4.png", "dims": PLAY_BUTTONS_DIMS, "coords": (650, 600), "button_num": 4},
+    {"tag": "play5_btn", "path": "play5.png", "dims": PLAY_BUTTONS_DIMS, "coords": (910, 600), "button_num": 5},
+]
 
 # --- DATABASE CONFIGURATION ---
 DB_CONFIG = {
@@ -46,13 +104,13 @@ DB_CONFIG = {
     "database": "hasaleveling_db"
 }
 
-# SKILL BUTTON CONFIGURATION (Left Side)
+# SKILL BUTTON CONFIGURATION (Left Side) - Handlers updated to use on_skill_button_click
 SKILL_BUTTONS = [
-    {"tag": "pythonskill_btn", "path": "pythonskill.png", "dims": (219, 137), "coords": (137, 411), "handler": lambda e: print("Python Skill Clicked")},
-    {"tag": "javaskill_btn", "path": "javaskill.png", "dims": (223, 139), "coords": (325, 408), "handler": lambda e: print("Java Skill Clicked")},
-    {"tag": "htmlskill_btn", "path": "htmlskill.png", "dims": (219, 137), "coords": (137, 513), "handler": lambda e: print("HTML Skill Clicked")},
-    {"tag": "c++skill_btn", "path": "c++skill.png", "dims": (223, 139), "coords": (327, 514), "handler": lambda e: print("C++ Skill Clicked")},
-    {"tag": "mysqlskill_btn", "path": "mysqlskill.png", "dims": (220, 137), "coords": (224, 614), "handler": lambda e: print("MySQL Skill Clicked")},
+    {"tag": "pythonskill_btn", "path": "pythonskill.png", "dims": (219, 137), "coords": (137, 411), "handler": lambda e: on_skill_button_click("Python")},
+    {"tag": "javaskill_btn", "path": "javaskill.png", "dims": (223, 139), "coords": (325, 408), "handler": lambda e: on_skill_button_click("Java")},
+    {"tag": "htmlskill_btn", "path": "htmlskill.png", "dims": (219, 137), "coords": (137, 513), "handler": lambda e: on_skill_button_click("HTML")},
+    {"tag": "c++skill_btn", "path": "c++skill.png", "dims": (223, 139), "coords": (327, 514), "handler": lambda e: on_skill_button_click("C++")},
+    {"tag": "mysqlskill_btn", "path": "mysqlskill.png", "dims": (220, 137), "coords": (224, 614), "handler": lambda e: on_skill_button_click("MySQL")},
 ]
 
 # Base SKILL PROGRESS BAR CONFIGURATION (Positions only, progress will come from DB)
@@ -93,7 +151,9 @@ class AppState:
         self.skill_bar_refs = []
         self.db_progress_data = {} 
         self.user_list = {} # Stores {username: gender} for selection
-
+        self.tutorial_icon_ref = None # Reference for the tutorial icon
+        self.current_tutorial_skill = None # Stores the last clicked skill for the tutorial view
+        
 STATE = AppState()
 
 # =============================
@@ -180,7 +240,7 @@ def insert_new_user(username, gender):
         cursor = conn.cursor()
         insert_query = """
         INSERT INTO user_progress (username, gender, html_progress, cplusplus_progress, mysql_progress, python_progress, java_progress)
-        VALUES (%s, %s, 0.0, 0.0, 0.0, 0.0, 0.0)
+        VALUES (%s, %s, 0.10, 0.10, 0.10, 0.10, 0.10)
         """
         cursor.execute(insert_query, (username.upper(), gender))
         conn.commit()
@@ -238,7 +298,8 @@ def load_pil_image(filename, width, height, mode='RGBA'):
         return placeholder
     
     img = Image.open(path).convert(mode)
-    return img.resize((width, height), Image.Resampling.LANCZOS)
+    # Note: PIL.Image.resize requires integer dimensions
+    return img.resize((width, height), Image.Resampling.LANCZOS) 
 
 def draw_skill_progress_bar(canvas, bar_data):
     """Draws a custom SEGMENTED styled progress bar on the canvas."""
@@ -379,7 +440,9 @@ def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler, is
     Creates a button, sets up state, and binds all events (enter, leave, click).
     If is_active is True, it disables click/hover events and pulsing.
     """
-    pil_base = load_pil_image(filename, *dims, mode='RGBA')
+    w, h = dims
+    # Round to integer dimensions for PIL library (19.5 -> 20, 24.3 -> 24)
+    pil_base = load_pil_image(filename, round(w), round(h), mode='RGBA') 
     photo = ImageTk.PhotoImage(pil_base)
     
     canvas.create_image(*coords, image=photo, anchor="center", tags=tag)
@@ -508,8 +571,17 @@ def clear_current_frame():
     STATE.bg_ref = None 
     STATE.banner_char_ref = None 
     STATE.skill_bar_refs = [] 
+    STATE.tutorial_icon_ref = None # Clear tutorial icon reference
 
-# MODIFIED: Removed 'active_tag' parameter and all related logic.
+def on_tutorial_nav_click(event):
+    """Handles click on the Tutorials navigation button, enforcing a skill selection."""
+    if STATE.current_tutorial_skill:
+        # Go to the tutorial for the last selected skill
+        show_fourth_frame(STATE.current_tutorial_skill)
+    else:
+        # If no skill has ever been selected, show a warning
+        messagebox.showwarning("Skill Selection Required", "Please click a skill button on the left side of the Dashboard (Python, Java, etc.) to view its tutorial.")
+
 def create_nav_buttons(canvas, win):
     """
     Creates all navigation buttons on the given canvas without any active state highlight.
@@ -519,7 +591,7 @@ def create_nav_buttons(canvas, win):
 
     NAV_BUTTONS = [
         {"tag": "homenav_btn", "path": "homenav.png", "dims": (52, 65), "coords": (371, NAV_BAR_Y_CENTER), "handler": lambda e: show_third_frame()},
-        {"tag": "tutorialnav_btn", "path": "tutorialnav.png", "dims": (82, 60), "coords": (545, NAV_BAR_Y_CENTER), "handler": lambda e: show_fourth_frame()},
+        {"tag": "tutorialnav_btn", "path": "tutorialnav.png", "dims": (82, 60), "coords": (545, NAV_BAR_Y_CENTER), "handler": on_tutorial_nav_click}, 
         {"tag": "problemsnav_btn", "path": "problemsnav.png", "dims": (84, 60), "coords": (761, NAV_BAR_Y_CENTER), "handler": lambda e: show_fifth_frame()},
         {"tag": "exitnav_btn", "path": "exitnav.png", "dims": (73, 65), "coords": (961, NAV_BAR_Y_CENTER), "handler": lambda e: on_nav_exit_click(win)},
     ]
@@ -691,28 +763,95 @@ def show_third_frame():
         draw_skill_progress_bar(canvas, bar_data)
         
     # --- NAVIGATION BAR ELEMENTS ---
-    # MODIFIED: Call without active_tag
     create_nav_buttons(canvas, win)
         
     # --- SKILL BUTTONS ---
     for btn in SKILL_BUTTONS:
         create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], btn["handler"])
 
+def on_skill_button_click(skill_name):
+    """Handler to transition from Frame 3 (Dashboard) to Frame 4 (Tutorials) 
+    and pass the selected skill name. Also sets the state."""
+    STATE.current_tutorial_skill = skill_name # SET THE STATE HERE
+    show_fourth_frame(skill_name)
 
-def show_fourth_frame():
-    """Tutorials View (Frame 4)"""
+def open_tutorial_link(button_num):
+    """
+    Opens the corresponding YouTube link for the selected skill and button number.
+    """
+    skill = STATE.current_tutorial_skill
+    if not skill:
+        messagebox.showerror("Error", "No skill selected for tutorial video playback.")
+        return
+        
+    skill_links = TUTORIAL_LINKS.get(skill)
+    if not skill_links:
+        messagebox.showerror("Error", f"No tutorial links defined for skill: {skill}")
+        return
+        
+    link = skill_links.get(button_num)
+    
+    if link and link.startswith("http"):
+        try:
+            # Open the link in a new browser tab
+            webbrowser.open_new_tab(link)
+        except Exception as e:
+            messagebox.showerror("System Error", f"Failed to open link. Please ensure you have a web browser installed. Error: {e}")
+    else:
+        messagebox.showwarning("Link Missing", f"Link for {skill} Tutorial {button_num} is not set or invalid in TUTORIAL_LINKS.")
+
+
+def show_fourth_frame(skill_name=None):
+    """Tutorials View (Frame 4) - Now displays skill icon and tutorial play buttons."""
     def close_handler():
         STATE.landscape_window.destroy()
         create_main_menu() 
         
     win, canvas = create_landscape_window("Hasa Leveling - Tutorials", close_handler)
     
-    tk.Label(canvas, 
-             text="TUTORIALS VIEW (FRAME 4)\n\nThis is where the user learns game mechanics.",
-             font=("Arial", 24, "bold"), fg="white", bg=canvas['bg']
-            ).place(relx=0.5, rely=0.5, anchor="center")
+    # Load and set the background image
+    tutorial_image = load_pil_image("tutorialbg.png", LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, mode='RGB')
+    tutorial_photo = ImageTk.PhotoImage(tutorial_image)
+    canvas.create_image(0, 0, image=tutorial_photo, anchor="nw")
+    STATE.bg_ref = tutorial_photo 
+    
+    # --- DYNAMIC TUTORIAL ICON DISPLAY ---
+    if skill_name:
+        # Map skill name (e.g., "C++" to "tutc++.png", "Python" to "tutpython.png")
+        skill_filename = f"tut{skill_name.lower().replace('+', '')}.png"
+        
+        # Load and display the icon at the specified position
+        icon_pil = load_pil_image(skill_filename, *TUTORIAL_ICON_DIMS, mode='RGBA')
+        icon_photo = ImageTk.PhotoImage(icon_pil)
+        STATE.tutorial_icon_ref = icon_photo # Keep a reference
+
+        # Use the defined coordinates (TUTORIAL_ICON_X, TUTORIAL_ICON_Y)
+        canvas.create_image(
+            TUTORIAL_ICON_X, 
+            TUTORIAL_ICON_Y, 
+            image=icon_photo, 
+            anchor="center", 
+            tags="tutorial_skill_icon"
+        )
+    # -------------------------------------
+
+    # --- PLAY BUTTONS (NEW) ---
+    for btn in PLAY_BUTTONS_CONFIG:
+        # Pass the button_num to the open_tutorial_link handler
+        handler = lambda e, num=btn["button_num"]: open_tutorial_link(num)
+        
+        create_pulsing_button(
+            canvas, 
+            btn["tag"], 
+            btn["path"],
+            btn["dims"], 
+            btn["coords"], 
+            handler,
+            is_active=False 
+        )
+    # ---------------------------
             
-    # MODIFIED: Call without active_tag
+    # Navigation Buttons
     create_nav_buttons(canvas, win)
 
 
@@ -729,7 +868,7 @@ def show_fifth_frame():
              font=("Arial", 24, "bold"), fg="white", bg=canvas['bg']
             ).place(relx=0.5, rely=0.5, anchor="center")
             
-    # MODIFIED: Call without active_tag
+    # Navigation Buttons
     create_nav_buttons(canvas, win)
 
 

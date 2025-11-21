@@ -1,1 +1,1 @@
- dialog.geometry("350x300")
+O
