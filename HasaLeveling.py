@@ -28,13 +28,11 @@ LANDSCAPE_SLIDER_X = LANDSCAPE_WIDTH - LANDSCAPE_SLIDER_WIDTH - 110
 LANDSCAPE_SLIDER_Y = 700 
 
 # --- AVATAR & USERNAME TEXT CONSTANTS (For Frame 3) ---
-# --- AVATAR CONSTANTS ---
-AVATAR_CENTER_X = 1080  # X-position for the character avatar image (ADJUSTED to center in the right circle)
-AVATAR_CENTER_Y = 130 # Y-position for the character avatar image (ADJUSTED to fit inside the circle)
+AVATAR_CENTER_X = 1080  
+AVATAR_CENTER_Y = 130 
 
-# --- USERNAME TEXT CONSTANTS ---
-USERNAME_TEXT_X = 350 # X-position for the username text 
-USER_NAME_TEXT_Y = 125 # Y-position for the username text (ADJUSTED to be lower)
+USERNAME_TEXT_X = 350
+USER_NAME_TEXT_Y = 125
 
 # Avatar Dimensions for Individual Scaling
 MALE_AVATAR_DIMS = (560, 315)
@@ -182,7 +180,7 @@ def insert_new_user(username, gender):
         cursor = conn.cursor()
         insert_query = """
         INSERT INTO user_progress (username, gender, html_progress, cplusplus_progress, mysql_progress, python_progress, java_progress)
-        VALUES (%s, %s, 0.00, 0.00, 0.00, 0.00, 0.00)
+        VALUES (%s, %s, 0.0, 0.0, 0.0, 0.0, 0.0)
         """
         cursor.execute(insert_query, (username.upper(), gender))
         conn.commit()
@@ -324,8 +322,6 @@ def pulse(tag):
     MIN_SCALE = 1.00 # Base size
     MAX_SCALE = 1.05 # Maximum size (5% larger than base)
 
-    target_scale = MAX_SCALE if data["hover"] else MIN_SCALE
-    
     if data["hover"]:
         if data["growing"]:
             data["scale"] = min(MAX_SCALE, data["scale"] + STEP)
@@ -378,8 +374,11 @@ def on_leave(event, tag):
     if data:
         data["hover"] = False
 
-def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler):
-    """Creates a button, sets up state, and binds all events (enter, leave, click)."""
+def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler, is_active=False):
+    """
+    Creates a button, sets up state, and binds all events (enter, leave, click).
+    If is_active is True, it disables click/hover events and pulsing.
+    """
     pil_base = load_pil_image(filename, *dims, mode='RGBA')
     photo = ImageTk.PhotoImage(pil_base)
     
@@ -390,9 +389,15 @@ def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler):
     
     setattr(canvas, f"{tag}_img_ref", photo) 
     
-    canvas.tag_bind(tag, "<Enter>", lambda e: on_enter(e, tag))
-    canvas.tag_bind(tag, "<Leave>", lambda e: on_leave(e, tag))
-    canvas.tag_bind(tag, "<Button-1>", click_handler)
+    if not is_active:
+        canvas.tag_bind(tag, "<Enter>", lambda e: on_enter(e, tag))
+        canvas.tag_bind(tag, "<Leave>", lambda e: on_leave(e, tag))
+        canvas.tag_bind(tag, "<Button-1>", click_handler)
+    else:
+        # If active, disable hover/click effects and set default cursor
+        canvas.tag_bind(tag, "<Enter>", lambda e: STATE.root.config(cursor="arrow"))
+        canvas.tag_bind(tag, "<Leave>", lambda e: STATE.root.config(cursor=""))
+
 
 # ---------------------------------------------------------
 # AUDIO CONTROL FUNCTIONS & SLIDER CREATION
@@ -504,6 +509,34 @@ def clear_current_frame():
     STATE.banner_char_ref = None 
     STATE.skill_bar_refs = [] 
 
+# MODIFIED: Removed 'active_tag' parameter and all related logic.
+def create_nav_buttons(canvas, win):
+    """
+    Creates all navigation buttons on the given canvas without any active state highlight.
+    All buttons are clickable and pulsing.
+    """
+    NAV_BAR_Y_CENTER = 730 
+
+    NAV_BUTTONS = [
+        {"tag": "homenav_btn", "path": "homenav.png", "dims": (52, 65), "coords": (371, NAV_BAR_Y_CENTER), "handler": lambda e: show_third_frame()},
+        {"tag": "tutorialnav_btn", "path": "tutorialnav.png", "dims": (82, 60), "coords": (545, NAV_BAR_Y_CENTER), "handler": lambda e: show_fourth_frame()},
+        {"tag": "problemsnav_btn", "path": "problemsnav.png", "dims": (84, 60), "coords": (761, NAV_BAR_Y_CENTER), "handler": lambda e: show_fifth_frame()},
+        {"tag": "exitnav_btn", "path": "exitnav.png", "dims": (73, 65), "coords": (961, NAV_BAR_Y_CENTER), "handler": lambda e: on_nav_exit_click(win)},
+    ]
+    
+    for btn in NAV_BUTTONS:
+        # is_active is set to False (default) so all buttons pulse and are clickable
+        create_pulsing_button(
+            canvas, 
+            btn["tag"], 
+            btn["path"],
+            btn["dims"], 
+            btn["coords"], 
+            btn["handler"],
+            is_active=False 
+        )
+
+
 def create_main_menu():
     clear_current_frame()
     
@@ -515,7 +548,6 @@ def create_main_menu():
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas
 
-    # --- DEBUGGING: Bind click event to log coordinates ---
     canvas.bind("<Button-1>", log_coordinates)
     
     bg_image = load_pil_image("bg.png", WINDOW_WIDTH, WINDOW_HEIGHT, mode='RGB')
@@ -549,7 +581,6 @@ def show_second_frame():
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas
 
-    # --- DEBUGGING: Bind click event to log coordinates ---
     canvas.bind("<Button-1>", log_coordinates)
 
     bg2_image = load_pil_image("bg2.png", WINDOW_WIDTH, WINDOW_HEIGHT, mode='RGB')
@@ -603,7 +634,6 @@ def create_landscape_window(title, close_handler):
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas 
 
-    # --- DEBUGGING: Bind click event to log coordinates on landscape view ---
     canvas.bind("<Button-1>", log_coordinates)
     
     create_volume_slider(win, is_portrait=False) 
@@ -632,12 +662,12 @@ def show_third_frame():
     STATE.bg_ref = dashboard_photo 
     
     # --- DYNAMIC BANNER CONTENT ---
-    # Username Shadow Text - uses the new USERNAME_TEXT_X
+    # Username Shadow Text
     canvas.create_text(
         USERNAME_TEXT_X + 2, USER_NAME_TEXT_Y + 2, 
         text=STATE.user_name.upper(), font=("Arial Black", 93, "bold"), fill="#3399FF", anchor="center", tags="user_name_shadow"
     )
-    # Main Username Text - uses the new USERNAME_TEXT_X
+    # Main Username Text
     canvas.create_text(
         USERNAME_TEXT_X, USER_NAME_TEXT_Y, 
         text=STATE.user_name.upper(), font=("Arial Black", 93, "bold"), fill="#FFFFFF", anchor="center", justify="center", tags="user_name_text"
@@ -650,7 +680,7 @@ def show_third_frame():
     char_photo = ImageTk.PhotoImage(char_pil)
     STATE.banner_char_ref = char_photo 
     
-    # Character Avatar - uses the new AVATAR_CENTER_X and AVATAR_CENTER_Y
+    # Character Avatar
     canvas.create_image(AVATAR_CENTER_X, AVATAR_CENTER_Y, image=char_photo, anchor="center", tags="character_avatar")
     
     # --- SKILL PROGRESS BARS (DATABASE-DRIVEN) ---
@@ -661,19 +691,8 @@ def show_third_frame():
         draw_skill_progress_bar(canvas, bar_data)
         
     # --- NAVIGATION BAR ELEMENTS ---
-    NAV_BAR_Y_CENTER = 730 
-
-    NAV_BUTTONS = [
-        {"tag": "homenav_btn", "path": "homenav.png", "dims": (52, 65), "coords": (371, NAV_BAR_Y_CENTER), "handler": lambda e: show_third_frame()},
-        {"tag": "tutorialnav_btn", "path": "tutorialnav.png", "dims": (82, 60), "coords": (545, NAV_BAR_Y_CENTER), "handler": lambda e: show_fourth_frame()},
-        {"tag": "problemsnav_btn", "path": "problemsnav.png", "dims": (84, 60), "coords": (761, NAV_BAR_Y_CENTER), "handler": lambda e: show_fifth_frame()},
-        
-        # The exit button triggers 'Sign Out' which returns to Frame 1
-        {"tag": "exitnav_btn", "path": "exitnav.png", "dims": (73, 65), "coords": (961, NAV_BAR_Y_CENTER), "handler": lambda e: on_nav_exit_click(win)},
-    ]
-
-    for btn in NAV_BUTTONS:
-        create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], btn["handler"])
+    # MODIFIED: Call without active_tag
+    create_nav_buttons(canvas, win)
         
     # --- SKILL BUTTONS ---
     for btn in SKILL_BUTTONS:
@@ -693,7 +712,8 @@ def show_fourth_frame():
              font=("Arial", 24, "bold"), fg="white", bg=canvas['bg']
             ).place(relx=0.5, rely=0.5, anchor="center")
             
-    tk.Button(canvas, text="Return to Dashboard (Frame 3)", command=show_third_frame, font=("Arial", 12)).place(x=10, y=10)
+    # MODIFIED: Call without active_tag
+    create_nav_buttons(canvas, win)
 
 
 def show_fifth_frame():
@@ -709,7 +729,8 @@ def show_fifth_frame():
              font=("Arial", 24, "bold"), fg="white", bg=canvas['bg']
             ).place(relx=0.5, rely=0.5, anchor="center")
             
-    tk.Button(canvas, text="Return to Dashboard (Frame 3)", command=show_third_frame, font=("Arial", 12)).place(x=10, y=10)
+    # MODIFIED: Call without active_tag
+    create_nav_buttons(canvas, win)
 
 
 # ---------------------------------------------------------
@@ -853,21 +874,20 @@ def confirm_action(action, window_to_close):
 
     if confirmation:
         if action == 'Exit':
-            # --- FIX: Ensure Pygame mixer is explicitly stopped and quit on EXIT ---
+            # Ensure Pygame mixer is explicitly stopped and quit on EXIT
             try:
                 pygame.mixer.music.stop()
                 pygame.mixer.quit() 
             except Exception as e:
                 print(f"Warning: Pygame mixer quit failed: {e}")
                 pass 
-            # ----------------------------------------------------------------------
 
             if window_to_close:
                 window_to_close.destroy()
             STATE.root.destroy()
         
         elif action == 'Sign Out':
-            # --- FIX: Ensure root window is visible when returning to main menu ---
+            # Ensure root window is visible when returning to main menu
             if window_to_close:
                 window_to_close.destroy()
             
