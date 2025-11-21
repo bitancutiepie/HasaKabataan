@@ -1,0 +1,1 @@
+ dialog.geometry("350x300")
