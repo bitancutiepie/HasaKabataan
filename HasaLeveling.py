@@ -27,9 +27,14 @@ LANDSCAPE_ICON_SIZE = 25
 LANDSCAPE_SLIDER_X = LANDSCAPE_WIDTH - LANDSCAPE_SLIDER_WIDTH - 110 
 LANDSCAPE_SLIDER_Y = 700 
 
-# --- BANNER CONSTANTS (For Frame 3) ---
-BANNER_CENTER_X, BANNER_CENTER_Y = 664, 134 
-USER_NAME_TEXT_Y = 100 
+# --- AVATAR & USERNAME TEXT CONSTANTS (For Frame 3) ---
+# --- AVATAR CONSTANTS ---
+AVATAR_CENTER_X = 1080  # X-position for the character avatar image (ADJUSTED to center in the right circle)
+AVATAR_CENTER_Y = 130 # Y-position for the character avatar image (ADJUSTED to fit inside the circle)
+
+# --- USERNAME TEXT CONSTANTS ---
+USERNAME_TEXT_X = 350 # X-position for the username text 
+USER_NAME_TEXT_Y = 125 # Y-position for the username text (ADJUSTED to be lower)
 
 # Avatar Dimensions for Individual Scaling
 MALE_AVATAR_DIMS = (560, 315)
@@ -177,7 +182,7 @@ def insert_new_user(username, gender):
         cursor = conn.cursor()
         insert_query = """
         INSERT INTO user_progress (username, gender, html_progress, cplusplus_progress, mysql_progress, python_progress, java_progress)
-        VALUES (%s, %s, 0.10, 0.10, 0.10, 0.10, 0.10)
+        VALUES (%s, %s, 0.00, 0.00, 0.00, 0.00, 0.00)
         """
         cursor.execute(insert_query, (username.upper(), gender))
         conn.commit()
@@ -219,6 +224,11 @@ def delete_user_progress(username):
 # =============================
 # Helper Functions
 # =============================
+
+def log_coordinates(event):
+    """Prints the X and Y coordinates of a click event for debugging."""
+    print(f"Clicked Coordinates (X, Y): {event.x}, {event.y}")
+
 def load_pil_image(filename, width, height, mode='RGBA'):
     """Loads, resizes, and returns a PIL Image object with alpha channel."""
     path = os.path.join(ASSETS_DIR, filename)
@@ -505,6 +515,9 @@ def create_main_menu():
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas
 
+    # --- DEBUGGING: Bind click event to log coordinates ---
+    canvas.bind("<Button-1>", log_coordinates)
+    
     bg_image = load_pil_image("bg.png", WINDOW_WIDTH, WINDOW_HEIGHT, mode='RGB')
     bg_photo = ImageTk.PhotoImage(bg_image)
     canvas.create_image(0, 0, image=bg_photo, anchor="nw")
@@ -535,6 +548,9 @@ def show_second_frame():
                        highlightthickness=0, bg=STATE.root['bg'])
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas
+
+    # --- DEBUGGING: Bind click event to log coordinates ---
+    canvas.bind("<Button-1>", log_coordinates)
 
     bg2_image = load_pil_image("bg2.png", WINDOW_WIDTH, WINDOW_HEIGHT, mode='RGB')
     bg2_photo = ImageTk.PhotoImage(bg2_image)
@@ -586,6 +602,9 @@ def create_landscape_window(title, close_handler):
                        highlightthickness=0, bg=win['bg']) 
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas 
+
+    # --- DEBUGGING: Bind click event to log coordinates on landscape view ---
+    canvas.bind("<Button-1>", log_coordinates)
     
     create_volume_slider(win, is_portrait=False) 
     
@@ -613,12 +632,14 @@ def show_third_frame():
     STATE.bg_ref = dashboard_photo 
     
     # --- DYNAMIC BANNER CONTENT ---
+    # Username Shadow Text - uses the new USERNAME_TEXT_X
     canvas.create_text(
-        BANNER_CENTER_X + 2, USER_NAME_TEXT_Y + 2, 
+        USERNAME_TEXT_X + 2, USER_NAME_TEXT_Y + 2, 
         text=STATE.user_name.upper(), font=("Arial Black", 93, "bold"), fill="#3399FF", anchor="center", tags="user_name_shadow"
     )
+    # Main Username Text - uses the new USERNAME_TEXT_X
     canvas.create_text(
-        BANNER_CENTER_X, USER_NAME_TEXT_Y, 
+        USERNAME_TEXT_X, USER_NAME_TEXT_Y, 
         text=STATE.user_name.upper(), font=("Arial Black", 93, "bold"), fill="#FFFFFF", anchor="center", justify="center", tags="user_name_text"
     )
     
@@ -629,7 +650,8 @@ def show_third_frame():
     char_photo = ImageTk.PhotoImage(char_pil)
     STATE.banner_char_ref = char_photo 
     
-    canvas.create_image(BANNER_CENTER_X, BANNER_CENTER_Y, image=char_photo, anchor="center", tags="character_avatar")
+    # Character Avatar - uses the new AVATAR_CENTER_X and AVATAR_CENTER_Y
+    canvas.create_image(AVATAR_CENTER_X, AVATAR_CENTER_Y, image=char_photo, anchor="center", tags="character_avatar")
     
     # --- SKILL PROGRESS BARS (DATABASE-DRIVEN) ---
     for bar in BASE_SKILL_PROGRESS_BARS:
