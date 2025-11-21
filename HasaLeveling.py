@@ -87,13 +87,13 @@ TUTORIAL_LINKS = {
 }
 
 # --- TUTORIAL PLAY BUTTON CONFIGURATION (UPDATED DIMENSIONS) ---
-PLAY_BUTTONS_DIMS = (19.5, 24.3) # Updated dimensions: 19.5px width and 24.3 height for all
+PLAY_BUTTONS_DIMS = (156.1, 47.3) # Updated dimensions: 19.5px width and 24.3 height for all
 PLAY_BUTTONS_CONFIG = [
-    {"tag": "play1_btn", "path": "play1.png", "dims": PLAY_BUTTONS_DIMS, "coords": (515, 419), "button_num": 1},
-    {"tag": "play2_btn", "path": "play2.png", "dims": PLAY_BUTTONS_DIMS, "coords": (772, 419), "button_num": 2},
-    {"tag": "play3_btn", "path": "play3.png", "dims": PLAY_BUTTONS_DIMS, "coords": (1030, 419), "button_num": 3},
-    {"tag": "play4_btn", "path": "play4.png", "dims": PLAY_BUTTONS_DIMS, "coords": (650, 600), "button_num": 4},
-    {"tag": "play5_btn", "path": "play5.png", "dims": PLAY_BUTTONS_DIMS, "coords": (910, 600), "button_num": 5},
+    {"tag": "play1_btn", "path": "play1.png", "dims": PLAY_BUTTONS_DIMS, "coords": (514, 422), "button_num": 1},
+    {"tag": "play2_btn", "path": "play2.png", "dims": PLAY_BUTTONS_DIMS, "coords": (773, 422), "button_num": 2},
+    {"tag": "play3_btn", "path": "play3.png", "dims": PLAY_BUTTONS_DIMS, "coords": (1037, 422), "button_num": 3},
+    {"tag": "play4_btn", "path": "play4.png", "dims": PLAY_BUTTONS_DIMS, "coords": (654, 598), "button_num": 4},
+    {"tag": "play5_btn", "path": "play5.png", "dims": PLAY_BUTTONS_DIMS, "coords": (921, 598), "button_num": 5},
 ]
 
 # --- DATABASE CONFIGURATION ---
