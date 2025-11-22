@@ -5,10 +5,13 @@ import os
 import pygame
 import json
 import mysql.connector
-import webbrowser # ADDED: For opening YouTube links
+import webbrowser 
 
 # --- GLOBAL CONSTANTS ---
 ASSETS_DIR = "assets"
+
+# NEW: Sound effect file path
+CLICK_SOUND_PATH = os.path.join(ASSETS_DIR, "clicksoundeffect.wav")
 
 # PORTRAIT Constants (Root Window)
 WINDOW_WIDTH = 520
@@ -29,32 +32,28 @@ LANDSCAPE_SLIDER_X = LANDSCAPE_WIDTH - LANDSCAPE_SLIDER_WIDTH - 110
 LANDSCAPE_SLIDER_Y = 700 
 
 # --- AVATAR & USERNAME TEXT CONSTANTS (For Frame 3) ---
-# --- AVATAR CONSTANTS ---
 AVATAR_CENTER_X = 1080  
 AVATAR_CENTER_Y = 130 
-
-# --- USERNAME TEXT CONSTANTS ---
-USERNAME_TEXT_X = 350
+USERNAME_TEXT_X = 450
 USER_NAME_TEXT_Y = 125
 
 # Avatar Dimensions for Individual Scaling
 MALE_AVATAR_DIMS = (560, 315)
 FEMALE_AVATAR_DIMS = (522, 273) 
 
-# --- TUTORIAL FRAME ICON CONSTANTS (UPDATED) ---
-TUTORIAL_ICON_X = 240  # The X-coordinate for the tutorial icon
+# --- TUTORIAL FRAME ICON CONSTANTS ---
+TUTORIAL_ICON_X = 240 
 TUTORIAL_ICON_Y = 455 
-TUTORIAL_ICON_DIMS = (160, 203) # Dimensions for the tutorial icons
+TUTORIAL_ICON_DIMS = (160, 203)
 
-# --- TUTORIAL YOUTUBE LINKS (NEW SECTION) ---
-# IMPORTANT: Replace the placeholder URLs with actual YouTube tutorial links
+# --- TUTORIAL YOUTUBE LINKS ---
 TUTORIAL_LINKS = {
     "Python": {
         1: "https://www.youtube.com/watch?v=python_link_1", 
         2: "https://www.youtube.com/watch?v=python_link_2",
         3: "https://www.youtube.com/watch?v=python_link_3",
         4: "https://www.youtube.com/watch?v=python_link_4",
-        5: "https://www.youtube.com/watch?v=python_link_5"
+        5: "https://www.youtube.com/watch="
     },
     "Java": {
         1: "https://www.youtube.com/watch?v=java_link_1", 
@@ -86,8 +85,8 @@ TUTORIAL_LINKS = {
     },
 }
 
-# --- TUTORIAL PLAY BUTTON CONFIGURATION (UPDATED DIMENSIONS) ---
-PLAY_BUTTONS_DIMS = (156.1, 47.3) # Updated dimensions: 19.5px width and 24.3 height for all
+# --- TUTORIAL PLAY BUTTON CONFIGURATION ---
+PLAY_BUTTONS_DIMS = (156.1, 47.3) 
 PLAY_BUTTONS_CONFIG = [
     {"tag": "play1_btn", "path": "play1.png", "dims": PLAY_BUTTONS_DIMS, "coords": (514, 422), "button_num": 1},
     {"tag": "play2_btn", "path": "play2.png", "dims": PLAY_BUTTONS_DIMS, "coords": (773, 422), "button_num": 2},
@@ -104,7 +103,7 @@ DB_CONFIG = {
     "database": "hasaleveling_db"
 }
 
-# SKILL BUTTON CONFIGURATION (Left Side) - Handlers updated to use on_skill_button_click
+# SKILL BUTTON CONFIGURATION (Left Side)
 SKILL_BUTTONS = [
     {"tag": "pythonskill_btn", "path": "pythonskill.png", "dims": (219, 137), "coords": (137, 411), "handler": lambda e: on_skill_button_click("Python")},
     {"tag": "javaskill_btn", "path": "javaskill.png", "dims": (223, 139), "coords": (325, 408), "handler": lambda e: on_skill_button_click("Java")},
@@ -113,7 +112,7 @@ SKILL_BUTTONS = [
     {"tag": "mysqlskill_btn", "path": "mysqlskill.png", "dims": (220, 137), "coords": (224, 614), "handler": lambda e: on_skill_button_click("MySQL")},
 ]
 
-# Base SKILL PROGRESS BAR CONFIGURATION (Positions only, progress will come from DB)
+# BASE SKILL PROGRESS BAR CONFIGURATION
 BASE_SKILL_PROGRESS_BARS = [
     {"skill": "HTML", "db_key": "html_progress", "x": 981, "y": 371, "w": 308, "h": 31, "color": "#007BA7"}, 
     {"skill": "C++", "db_key": "cplusplus_progress", "x": 981, "y": 432, "w": 308, "h": 31, "color": "#A03472"}, 
@@ -130,29 +129,25 @@ class AppState:
         self.current_canvas = None
         self.landscape_window = None 
         self.gender_label = None
-        # Sliders
         self.volume_slider_root = None
         self.volume_slider_landscape = None
-        # Icons
         self.app_icon_ref = None 
         self.icon_ref_portrait = None
         self.icon_label_portrait = None
         self.icon_ref_landscape = None
         self.icon_label_landscape = None
-        
-        # State Data
         self.button_data = {}
         self.selected_gender = None
         self.user_name = None
         self.bg_ref = None 
         self.initial_volume = 50.0
         self.banner_char_ref = None 
-        # Skill Progress Bar references to prevent garbage collection
         self.skill_bar_refs = []
         self.db_progress_data = {} 
-        self.user_list = {} # Stores {username: gender} for selection
-        self.tutorial_icon_ref = None # Reference for the tutorial icon
-        self.current_tutorial_skill = None # Stores the last clicked skill for the tutorial view
+        self.user_list = {}
+        self.tutorial_icon_ref = None
+        self.current_tutorial_skill = None 
+        self.click_sound = None # NEW: Reference for the click sound
         
 STATE = AppState()
 
@@ -161,7 +156,6 @@ STATE = AppState()
 # =============================
 
 def get_db_connection():
-    """Attempts to connect to the MySQL database."""
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         return conn
@@ -174,11 +168,9 @@ def get_db_connection():
         return None
 
 def fetch_all_users():
-    """Fetches all usernames and genders from the database."""
     conn = get_db_connection()
     if not conn:
         return {}
-    
     user_data = {}
     try:
         cursor = conn.cursor()
@@ -195,10 +187,8 @@ def fetch_all_users():
     return user_data
 
 def get_user_progress(username):
-    """Fetches skill progress for the given user from the database."""
     conn = get_db_connection()
     if not conn:
-        # Fallback if connection fails
         return {
             "html_progress": 0.50, "cplusplus_progress": 0.50, 
             "mysql_progress": 0.50, "python_progress": 0.50, 
@@ -214,9 +204,7 @@ def get_user_progress(username):
         if data:
             progress_data = {key: float(value) for key, value in data.items() if key != 'gender'}
             progress_data["status"] = "success"
-            
             STATE.selected_gender = data['gender']
-            
             return progress_data
         
         return {key: 0.10 for key in ["html_progress", "cplusplus_progress", "mysql_progress", "python_progress", "java_progress"]}
@@ -224,15 +212,12 @@ def get_user_progress(username):
     except mysql.connector.Error as err:
         messagebox.showwarning("Database Warning", "Could not fetch user progress. Using default values.")
         return {key: 0.10 for key in ["html_progress", "cplusplus_progress", "mysql_progress", "python_progress", "java_progress"]}
-        
     finally:
         if conn and conn.is_connected():
             cursor.close()
             conn.close()
 
-
 def insert_new_user(username, gender):
-    """Inserts a new user with default progress into the database."""
     conn = get_db_connection()
     if not conn:
         return False
@@ -257,7 +242,6 @@ def insert_new_user(username, gender):
             conn.close()
 
 def delete_user_progress(username):
-    """Deletes a user's progress record from the database."""
     conn = get_db_connection()
     if not conn:
         return False
@@ -284,11 +268,9 @@ def delete_user_progress(username):
 # =============================
 
 def log_coordinates(event):
-    """Prints the X and Y coordinates of a click event for debugging."""
     print(f"Clicked Coordinates (X, Y): {event.x}, {event.y}")
 
 def load_pil_image(filename, width, height, mode='RGBA'):
-    """Loads, resizes, and returns a PIL Image object with alpha channel."""
     path = os.path.join(ASSETS_DIR, filename)
     if not os.path.exists(path):
         placeholder = Image.new(mode, (width, height), color='red')
@@ -296,13 +278,10 @@ def load_pil_image(filename, width, height, mode='RGBA'):
         draw = ImageDraw.Draw(placeholder)
         draw.text((10, 10), filename, fill=(255, 255, 255))
         return placeholder
-    
     img = Image.open(path).convert(mode)
-    # Note: PIL.Image.resize requires integer dimensions
     return img.resize((width, height), Image.Resampling.LANCZOS) 
 
 def draw_skill_progress_bar(canvas, bar_data):
-    """Draws a custom SEGMENTED styled progress bar on the canvas."""
     x, y, w, h = bar_data["x"], bar_data["y"], bar_data["w"], bar_data["h"]
     progress = bar_data["progress"]
     color = bar_data["color"]
@@ -312,7 +291,6 @@ def draw_skill_progress_bar(canvas, bar_data):
     segment_width = 4       
     gap_width = 1           
     
-    # 1. Draw the Outer Container
     canvas.create_rectangle(
         x, y, x + w, y + h, 
         outline="#FFFFFF", 
@@ -321,7 +299,6 @@ def draw_skill_progress_bar(canvas, bar_data):
         tags=f"{skill}_bar_outline"
     )
     
-    # Inner bar boundaries
     inner_x_start = x + padding
     inner_y_top = y + padding
     inner_y_bottom = y + h - padding
@@ -330,7 +307,6 @@ def draw_skill_progress_bar(canvas, bar_data):
     num_total_units = usable_width // segment_unit_width
     num_segments_to_fill = int(num_total_units * progress)
     
-    # 2. Draw the Segmented Progress Fill
     for i in range(num_total_units):
         start_x = inner_x_start + (i * segment_unit_width)
         end_x = start_x + segment_width
@@ -349,7 +325,6 @@ def draw_skill_progress_bar(canvas, bar_data):
             tags=f"{skill}_bar_segment_{i}"
         )
 
-    # 3. Draw the Percentage Text 
     percent_text = f"{int(progress * 100)}%"
     text_x = x + w - 30 
     text_y = y + h / 2
@@ -362,15 +337,32 @@ def draw_skill_progress_bar(canvas, bar_data):
         anchor="center",
         tags=f"{skill}_percent_text"
     )
-    
     STATE.skill_bar_refs.append(text_id)
 
+# NEW: Sound playing function
+def play_click_sound():
+    """Plays a short click sound effect."""
+    if STATE.click_sound:
+        try:
+            STATE.click_sound.play()
+        except pygame.error as e:
+            # Handle cases where mixer might be busy or sound object is invalid
+            print(f"Warning: Could not play click sound: {e}")
+            pass
+    else:
+        # Load the sound if it hasn't been loaded yet
+        try:
+            STATE.click_sound = pygame.mixer.Sound(CLICK_SOUND_PATH)
+            STATE.click_sound.play()
+        except pygame.error as e:
+            print(f"Error loading or playing click sound: {e}")
+        except FileNotFoundError:
+            print(f"Error: Click sound file not found at {CLICK_SOUND_PATH}")
 
 # ---------------------------------------------------------
 # ANIMATION & BINDING FUNCTIONS
 # ---------------------------------------------------------
 def pulse(tag):
-    """Animates the size of a button image."""
     try:
         canvas_ref = STATE.current_canvas
         if not canvas_ref or not canvas_ref.winfo_exists(): return
@@ -380,8 +372,8 @@ def pulse(tag):
     if not data: return
     
     STEP = 0.002
-    MIN_SCALE = 1.00 # Base size
-    MAX_SCALE = 1.05 # Maximum size (5% larger than base)
+    MIN_SCALE = 1.00 
+    MAX_SCALE = 1.05 
 
     if data["hover"]:
         if data["growing"]:
@@ -395,7 +387,6 @@ def pulse(tag):
         
     if not data["hover"] and data["scale"] == MIN_SCALE:
         if data["job"]:
-            # Cancel the animation job once it returns to base size and no longer hovered
             STATE.root.after_cancel(data["job"])
             data["job"] = None
         new_photo = ImageTk.PhotoImage(data["base_img"])
@@ -416,7 +407,6 @@ def pulse(tag):
     data["job"] = STATE.root.after(15, lambda: pulse(tag))
 
 def on_enter(event, tag):
-    """Handles hover-in event for pulse animation."""
     if tag == "next_btn" and STATE.selected_gender is None:
         STATE.root.config(cursor="arrow")
         return
@@ -429,19 +419,13 @@ def on_enter(event, tag):
             pulse(tag)
 
 def on_leave(event, tag):
-    """Handles hover-out event to stop pulse animation."""
     STATE.root.config(cursor="")
     data = STATE.button_data.get(tag)
     if data:
         data["hover"] = False
 
 def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler, is_active=False):
-    """
-    Creates a button, sets up state, and binds all events (enter, leave, click).
-    If is_active is True, it disables click/hover events and pulsing.
-    """
     w, h = dims
-    # Round to integer dimensions for PIL library (19.5 -> 20, 24.3 -> 24)
     pil_base = load_pil_image(filename, round(w), round(h), mode='RGBA') 
     photo = ImageTk.PhotoImage(pil_base)
     
@@ -455,18 +439,25 @@ def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler, is
     if not is_active:
         canvas.tag_bind(tag, "<Enter>", lambda e: on_enter(e, tag))
         canvas.tag_bind(tag, "<Leave>", lambda e: on_leave(e, tag))
-        canvas.tag_bind(tag, "<Button-1>", click_handler)
+        
+        # MODIFIED: Wrap the original handler to play sound first
+        def wrapped_handler(event):
+            play_click_sound()
+            click_handler(event)
+            
+        canvas.tag_bind(tag, "<Button-1>", wrapped_handler)
     else:
-        # If active, disable hover/click effects and set default cursor
-        canvas.tag_bind(tag, "<Enter>", lambda e: STATE.root.config(cursor="arrow"))
+        # For non-interactive buttons (like dashboard icons that navigate back)
+        # We still want the hand cursor for visual feedback, but no pulse animation
+        canvas.tag_bind(tag, "<Enter>", lambda e: STATE.root.config(cursor="hand2"))
         canvas.tag_bind(tag, "<Leave>", lambda e: STATE.root.config(cursor=""))
+        canvas.tag_bind(tag, "<Button-1>", lambda e: (play_click_sound(), click_handler(e)))
 
 
 # ---------------------------------------------------------
 # AUDIO CONTROL FUNCTIONS & SLIDER CREATION
 # ---------------------------------------------------------
 def set_volume(value):
-    """Updates pygame music volume based on slider value (0.0 to 1.0)."""
     try:
         volume = float(value) / 100.0
         pygame.mixer.music.set_volume(volume)
@@ -475,7 +466,6 @@ def set_volume(value):
         pass
         
 def start_music(music_file_path):
-    """Initializes pygame mixer, loads, and plays background music in a loop."""
     try:
         pygame.mixer.init()
         pygame.mixer.music.load(music_file_path)
@@ -488,8 +478,6 @@ def start_music(music_file_path):
         pass
 
 def create_volume_slider(parent_window, is_portrait):
-    """Creates, styles, and places the volume slider and icon."""
-    
     if is_portrait:
         slider_attr = "volume_slider_root"
         icon_label_attr = "icon_label_portrait"
@@ -536,9 +524,7 @@ def create_volume_slider(parent_window, is_portrait):
 
     icon_label = tk.Label(parent_window, image=icon_photo, bg=parent_window['bg'], bd=0)
     setattr(STATE, icon_label_attr, icon_label)
-    
     icon_label.place(x=start_x, y=y_position + slider_y_offset)
-
     slider.place(x=start_x + icon_size + 10, y=y_position, width=slider_width)
     
     if parent_window.winfo_class() != "Tk": 
@@ -553,10 +539,6 @@ def create_volume_slider(parent_window, is_portrait):
 # FRAME LOGIC
 # ---------------------------------------------------------
 def clear_current_frame():
-    """
-    Destroys the current canvas and associated dialog window.
-    Cancels all pending pulse animation jobs.
-    """
     for data in STATE.button_data.values():
         if data.get("job"):
             try:
@@ -571,55 +553,36 @@ def clear_current_frame():
     STATE.bg_ref = None 
     STATE.banner_char_ref = None 
     STATE.skill_bar_refs = [] 
-    STATE.tutorial_icon_ref = None # Clear tutorial icon reference
+    STATE.tutorial_icon_ref = None 
 
 def on_tutorial_nav_click(event):
-    """Handles click on the Tutorials navigation button, enforcing a skill selection."""
     if STATE.current_tutorial_skill:
-        # Go to the tutorial for the last selected skill
         show_fourth_frame(STATE.current_tutorial_skill)
     else:
-        # If no skill has ever been selected, show a warning
         messagebox.showwarning("Skill Selection Required", "Please click a skill button on the left side of the Dashboard (Python, Java, etc.) to view its tutorial.")
 
 def create_nav_buttons(canvas, win):
-    """
-    Creates all navigation buttons on the given canvas without any active state highlight.
-    All buttons are clickable and pulsing.
-    """
     NAV_BAR_Y_CENTER = 730 
-
     NAV_BUTTONS = [
         {"tag": "homenav_btn", "path": "homenav.png", "dims": (52, 65), "coords": (371, NAV_BAR_Y_CENTER), "handler": lambda e: show_third_frame()},
         {"tag": "tutorialnav_btn", "path": "tutorialnav.png", "dims": (82, 60), "coords": (545, NAV_BAR_Y_CENTER), "handler": on_tutorial_nav_click}, 
         {"tag": "problemsnav_btn", "path": "problemsnav.png", "dims": (84, 60), "coords": (761, NAV_BAR_Y_CENTER), "handler": lambda e: show_fifth_frame()},
         {"tag": "exitnav_btn", "path": "exitnav.png", "dims": (73, 65), "coords": (961, NAV_BAR_Y_CENTER), "handler": lambda e: on_nav_exit_click(win)},
     ]
-    
     for btn in NAV_BUTTONS:
-        # is_active is set to False (default) so all buttons pulse and are clickable
-        create_pulsing_button(
-            canvas, 
-            btn["tag"], 
-            btn["path"],
-            btn["dims"], 
-            btn["coords"], 
-            btn["handler"],
-            is_active=False 
-        )
+        # Note: If is_active is True, the click handler is bound directly inside create_pulsing_button 
+        # using the (play_click_sound(), click_handler(e)) tuple for simplicity and ensuring sound plays.
+        create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], btn["handler"], is_active=False)
 
 
 def create_main_menu():
     clear_current_frame()
-    
-    # Ensure root window is visible when returning to main menu
     STATE.root.deiconify() 
     
     canvas = tk.Canvas(STATE.root, width=WINDOW_WIDTH, height=WINDOW_HEIGHT, 
                        highlightthickness=0, bg=STATE.root['bg'])
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas
-
     canvas.bind("<Button-1>", log_coordinates)
     
     bg_image = load_pil_image("bg.png", WINDOW_WIDTH, WINDOW_HEIGHT, mode='RGB')
@@ -639,7 +602,6 @@ def create_main_menu():
 
 def show_second_frame():
     clear_current_frame()
-    
     STATE.root.deiconify() 
     if STATE.landscape_window:
         STATE.landscape_window.destroy()
@@ -652,7 +614,6 @@ def show_second_frame():
                        highlightthickness=0, bg=STATE.root['bg'])
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas
-
     canvas.bind("<Button-1>", log_coordinates)
 
     bg2_image = load_pil_image("bg2.png", WINDOW_WIDTH, WINDOW_HEIGHT, mode='RGB')
@@ -675,12 +636,10 @@ def show_second_frame():
     
     STATE.gender_label = tk.Label(canvas, text="", font=("Arial", 16, "bold"), 
                                   bg="#000000", fg="white", relief="flat")
-
     create_volume_slider(STATE.root, is_portrait=True)
 
 
 def create_landscape_window(title, close_handler):
-    """Initializes and configures a standard landscape Toplevel window."""
     clear_current_frame()
     STATE.root.withdraw() 
 
@@ -698,22 +657,17 @@ def create_landscape_window(title, close_handler):
     center_y = (STATE.root.winfo_screenheight() - LANDSCAPE_HEIGHT) // 2
     win.geometry(f"{LANDSCAPE_WIDTH}x{LANDSCAPE_HEIGHT}+{center_x}+{center_y}")
     
-    # Use the close_handler for the window's X button (top right)
     win.protocol("WM_DELETE_WINDOW", close_handler)
 
     canvas = tk.Canvas(win, width=LANDSCAPE_WIDTH, height=LANDSCAPE_HEIGHT, 
                        highlightthickness=0, bg=win['bg']) 
     canvas.pack(fill="both", expand=True)
     STATE.current_canvas = canvas 
-
     canvas.bind("<Button-1>", log_coordinates)
-    
     create_volume_slider(win, is_portrait=False) 
-    
     return win, canvas
 
 def show_third_frame():
-    """Game View (Frame 3) - Dashboard with dynamic data from MySQL."""
     if STATE.user_name is None or STATE.selected_gender is None:
         messagebox.showwarning("Error", "Missing user data. Please complete user selection or creation.")
         create_main_menu()
@@ -721,7 +675,6 @@ def show_third_frame():
 
     STATE.db_progress_data = get_user_progress(STATE.user_name)
 
-    # Handler for the Toplevel window's close button (X)
     def close_handler():
         STATE.landscape_window.destroy()
         create_main_menu()
@@ -733,13 +686,10 @@ def show_third_frame():
     canvas.create_image(0, 0, image=dashboard_photo, anchor="nw")
     STATE.bg_ref = dashboard_photo 
     
-    # --- DYNAMIC BANNER CONTENT ---
-    # Username Shadow Text
     canvas.create_text(
         USERNAME_TEXT_X + 2, USER_NAME_TEXT_Y + 2, 
         text=STATE.user_name.upper(), font=("Arial Black", 93, "bold"), fill="#3399FF", anchor="center", tags="user_name_shadow"
     )
-    # Main Username Text
     canvas.create_text(
         USERNAME_TEXT_X, USER_NAME_TEXT_Y, 
         text=STATE.user_name.upper(), font=("Arial Black", 93, "bold"), fill="#FFFFFF", anchor="center", justify="center", tags="user_name_text"
@@ -751,124 +701,195 @@ def show_third_frame():
     char_pil = load_pil_image(char_filename, *dims, mode='RGBA')
     char_photo = ImageTk.PhotoImage(char_pil)
     STATE.banner_char_ref = char_photo 
-    
-    # Character Avatar
     canvas.create_image(AVATAR_CENTER_X, AVATAR_CENTER_Y, image=char_photo, anchor="center", tags="character_avatar")
     
-    # --- SKILL PROGRESS BARS (DATABASE-DRIVEN) ---
     for bar in BASE_SKILL_PROGRESS_BARS:
         progress_value = STATE.db_progress_data.get(bar["db_key"], 0.10)
         bar_data = bar.copy()
         bar_data["progress"] = progress_value
         draw_skill_progress_bar(canvas, bar_data)
         
-    # --- NAVIGATION BAR ELEMENTS ---
     create_nav_buttons(canvas, win)
-        
-    # --- SKILL BUTTONS ---
     for btn in SKILL_BUTTONS:
         create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], btn["handler"])
 
 def on_skill_button_click(skill_name):
-    """Handler to transition from Frame 3 (Dashboard) to Frame 4 (Tutorials) 
-    and pass the selected skill name. Also sets the state."""
-    STATE.current_tutorial_skill = skill_name # SET THE STATE HERE
+    STATE.current_tutorial_skill = skill_name 
     show_fourth_frame(skill_name)
 
 def open_tutorial_link(button_num):
-    """
-    Opens the corresponding YouTube link for the selected skill and button number.
-    """
     skill = STATE.current_tutorial_skill
     if not skill:
         messagebox.showerror("Error", "No skill selected for tutorial video playback.")
         return
-        
     skill_links = TUTORIAL_LINKS.get(skill)
     if not skill_links:
         messagebox.showerror("Error", f"No tutorial links defined for skill: {skill}")
         return
-        
     link = skill_links.get(button_num)
-    
     if link and link.startswith("http"):
         try:
-            # Open the link in a new browser tab
             webbrowser.open_new_tab(link)
         except Exception as e:
             messagebox.showerror("System Error", f"Failed to open link. Please ensure you have a web browser installed. Error: {e}")
     else:
         messagebox.showwarning("Link Missing", f"Link for {skill} Tutorial {button_num} is not set or invalid in TUTORIAL_LINKS.")
 
+def on_tutorial_icon_click(event):
+    show_third_frame()
 
 def show_fourth_frame(skill_name=None):
-    """Tutorials View (Frame 4) - Now displays skill icon and tutorial play buttons."""
     def close_handler():
         STATE.landscape_window.destroy()
         create_main_menu() 
         
     win, canvas = create_landscape_window("Hasa Leveling - Tutorials", close_handler)
     
-    # Load and set the background image
     tutorial_image = load_pil_image("tutorialbg.png", LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, mode='RGB')
     tutorial_photo = ImageTk.PhotoImage(tutorial_image)
     canvas.create_image(0, 0, image=tutorial_photo, anchor="nw")
     STATE.bg_ref = tutorial_photo 
     
-    # --- DYNAMIC TUTORIAL ICON DISPLAY ---
     if skill_name:
-        # Map skill name (e.g., "C++" to "tutc++.png", "Python" to "tutpython.png")
         skill_filename = f"tut{skill_name.lower().replace('+', '')}.png"
-        
-        # Load and display the icon at the specified position
-        icon_pil = load_pil_image(skill_filename, *TUTORIAL_ICON_DIMS, mode='RGBA')
-        icon_photo = ImageTk.PhotoImage(icon_pil)
-        STATE.tutorial_icon_ref = icon_photo # Keep a reference
-
-        # Use the defined coordinates (TUTORIAL_ICON_X, TUTORIAL_ICON_Y)
-        canvas.create_image(
-            TUTORIAL_ICON_X, 
-            TUTORIAL_ICON_Y, 
-            image=icon_photo, 
-            anchor="center", 
-            tags="tutorial_skill_icon"
+        # Now using create_pulsing_button for hover effect
+        create_pulsing_button(
+            canvas, 
+            "tutorial_skill_icon", 
+            skill_filename, 
+            TUTORIAL_ICON_DIMS, 
+            (TUTORIAL_ICON_X, TUTORIAL_ICON_Y), 
+            on_tutorial_icon_click
         )
-    # -------------------------------------
 
-    # --- PLAY BUTTONS (NEW) ---
     for btn in PLAY_BUTTONS_CONFIG:
-        # Pass the button_num to the open_tutorial_link handler
         handler = lambda e, num=btn["button_num"]: open_tutorial_link(num)
+        create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], handler, is_active=False)
+            
+    create_nav_buttons(canvas, win)
+
+# --- NEW FUNCTION: PROBLEM SOLVER PLACEHOLDER ---
+def open_problem_solver(skill, problem_number):
+    """
+    Placeholder: This handles what happens when a folder is clicked.
+    Example: Open a window showing 'Java Problem #1'
+    """
+    print(f"Opening {skill} Problem #{problem_number}...")
+    messagebox.showinfo("Problem Selected", f"You opened {skill} Problem Folder #{problem_number}")
+    # Later, you can add logic here to open a specific image or window.
+
+
+# --- NEW FRAME: PROBLEM SELECTION ---
+def show_problem_selection_frame(skill_name):
+    """
+    Frame 6: Problem Selection View (Folders)
+    Displays the Skill Icon on the left and 5 Problem Folders on the right.
+    """
+    def close_handler():
+        STATE.landscape_window.destroy()
+        create_main_menu() 
+    
+    # Create Window
+    title = f"Hasa Leveling - {skill_name} Problems"
+    win, canvas = create_landscape_window(title, close_handler)
+    
+    # --- Background Image (problembg2.png) ---
+    bg_image = load_pil_image("problembg2.png", LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, mode='RGB')
+    bg_photo = ImageTk.PhotoImage(bg_image)
+    canvas.create_image(0, 0, image=bg_photo, anchor="nw")
+    STATE.bg_ref = bg_photo 
+
+    # ---------------------------------------------------------
+    # 1. LEFT SIDE: SKILL ICON (Same as Tutorial Frame)
+    # ---------------------------------------------------------
+    # Map skill name to filename (e.g., "Java" -> "tutjava.png")
+    skill_filename = f"tut{skill_name.lower().replace('+', '')}.png"
+    
+    # Now using create_pulsing_button for hover effect
+    create_pulsing_button(
+        canvas, 
+        "problem_skill_icon", 
+        skill_filename, 
+        TUTORIAL_ICON_DIMS, 
+        (TUTORIAL_ICON_X, TUTORIAL_ICON_Y), 
+        lambda e: show_fifth_frame()
+    )
+    
+    # ---------------------------------------------------------
+    # 2. RIGHT SIDE: FOLDER BUTTONS (Same positions as Play Buttons)
+    # ---------------------------------------------------------
+    
+    # IMPORTANT: Set this to the actual size of your problem folder pngs
+    FOLDER_DIMS = (150, 110) 
+    
+    # Offset to move folders up vertically
+    FOLDER_Y_OFFSET = 50 
+
+    # We reuse the coordinates from PLAY_BUTTONS_CONFIG but shift Y
+    for i, config in enumerate(PLAY_BUTTONS_CONFIG):
+        prob_num = i + 1
+        folder_tag = f"folder_{prob_num}_btn"
+        folder_path = f"problem{prob_num}.png" # problem1.png, problem2.png, etc.
+        
+        original_x, original_y = config["coords"]
+        folder_coords = (original_x, original_y - FOLDER_Y_OFFSET)
+        
+        # Handler: Open the specific problem
+        handler = lambda e, s=skill_name, n=prob_num: open_problem_solver(s, n)
         
         create_pulsing_button(
             canvas, 
-            btn["tag"], 
-            btn["path"],
-            btn["dims"], 
-            btn["coords"], 
-            handler,
-            is_active=False 
+            folder_tag, 
+            folder_path, 
+            FOLDER_DIMS, 
+            folder_coords, 
+            handler
         )
-    # ---------------------------
-            
-    # Navigation Buttons
+
+    # ---------------------------------------------------------
+    # Navigation Bar
     create_nav_buttons(canvas, win)
 
 
 def show_fifth_frame():
-    """Problems/Quests View (Frame 5)"""
+    """Problems/Quests Menu (Frame 5)"""
     def close_handler():
         STATE.landscape_window.destroy()
         create_main_menu() 
 
     win, canvas = create_landscape_window("Hasa Leveling - Problems/Quests", close_handler)
     
-    tk.Label(canvas, 
-             text="PROBLEMS/QUESTS VIEW (FRAME 5)\n\nThis is where the user solves problems and completes quests.",
-             font=("Arial", 24, "bold"), fg="white", bg=canvas['bg']
-            ).place(relx=0.5, rely=0.5, anchor="center")
+    problems_bg_image = load_pil_image("problemsbg.png", LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, mode='RGB')
+    problems_bg_photo = ImageTk.PhotoImage(problems_bg_image)
+    canvas.create_image(0, 0, image=problems_bg_photo, anchor="nw")
+    STATE.bg_ref = problems_bg_photo 
+    
+    # --- PROBLEM CATEGORY BUTTONS ---
+    # IMPORTANT: Update this to your actual image dimensions if they differ
+    PROBLEM_BTN_DIMS = (160, 203) 
+
+    # Centered horizontally and lowered
+    PROBLEM_BUTTONS = [
+        {"tag": "prob_java",   "path": "tutjava.png",   "coords": (243, 500),    "skill": "Java"},
+        {"tag": "prob_html",   "path": "tuthtml.png",   "coords": (463, 500),    "skill": "HTML"},
+        {"tag": "prob_c",      "path": "tutc.png",      "coords": (683, 500),    "skill": "C++"}, 
+        {"tag": "prob_mysql",  "path": "tutmysql.png",  "coords": (903, 500),    "skill": "MySQL"},
+        {"tag": "prob_python", "path": "tutpython.png", "coords": (1123, 500),   "skill": "Python"} 
+    ]
+
+    for btn in PROBLEM_BUTTONS:
+        # Link to the new folder selection frame
+        handler = lambda e, s=btn["skill"]: show_problem_selection_frame(s)
+        
+        create_pulsing_button(
+            canvas, 
+            btn["tag"], 
+            btn["path"], 
+            PROBLEM_BTN_DIMS, 
+            btn["coords"], 
+            handler
+        )
             
-    # Navigation Buttons
     create_nav_buttons(canvas, win)
 
 
@@ -876,31 +897,63 @@ def show_fifth_frame():
 # DIALOG & PROGRESSION FUNCTIONS
 # ---------------------------------------------------------
 def prompt_for_name():
-    """Pops up a dialog box to ask the user for their name, validating and registering a NEW user."""
-    
     if STATE.selected_gender is None:
         messagebox.showwarning("Selection Required", "Please select a gender (Male or Female) before proceeding.")
         return
 
+    # --- CONFIGURATION FOR NAME INPUT DIALOG ---
+    DIALOG_WIDTH = 350 # Increased width
+    DIALOG_HEIGHT = 300 # Increased height
+    
+    # Coordinates relative to the dialog canvas
+    ENTRY_Y = 175 # Adjusted Y position for the entry field
+    BUTTON_Y = 245 # Adjusted Y position for the register button
+    BUTTON_DIMS = (180, 65) # Adjusted dimensions for the register.png button
+    # -------------------------------------------
+
     dialog = tk.Toplevel(STATE.root)
     dialog.title("Register Character Name")
-    dialog.geometry("300x180")
+    dialog.geometry(f"{DIALOG_WIDTH}x{DIALOG_HEIGHT}")
     dialog.transient(STATE.root)
     dialog.grab_set()
     
-    dialog_x = STATE.root.winfo_x() + (STATE.root.winfo_width() // 2) - 150
-    dialog_y = STATE.root.winfo_y() + (STATE.root.winfo_height() // 2) - 90
+    dialog_x = STATE.root.winfo_x() + (STATE.root.winfo_width() // 2) - (DIALOG_WIDTH // 2)
+    dialog_y = STATE.root.winfo_y() + (STATE.root.winfo_height() // 2) - (DIALOG_HEIGHT // 2)
     dialog.geometry(f'+{dialog_x}+{dialog_y}')
+    
+    # Create Canvas for Background and Custom Buttons
+    canvas = tk.Canvas(dialog, width=DIALOG_WIDTH, height=DIALOG_HEIGHT, highlightthickness=0, bg="#000000")
+    canvas.pack(fill="both", expand=True)
 
-    tk.Label(dialog, text="Input NEW Character Name:", font=("Arial", 12, "bold")).pack(pady=5)
-    tk.Label(dialog, text="(Min: 4 chars, Max: 9 chars)", font=("Arial", 9)).pack()
-    name_entry = tk.Entry(dialog, width=30)
-    name_entry.pack(pady=5)
+    # --- Load Background Image ---
+    bg_pil = load_pil_image("registerForm.png", DIALOG_WIDTH, DIALOG_HEIGHT, mode='RGB')
+    bg_photo = ImageTk.PhotoImage(bg_pil)
+    canvas.create_image(0, 0, image=bg_photo, anchor="nw")
+    canvas.bg_ref = bg_photo  # Keep reference
+
+    # --- Title Text (COMMENTED OUT AS PER REQUEST) ---
+    # canvas.create_text(
+    #     DIALOG_WIDTH // 2, TITLE_Y, 
+    #     text="Input NEW Character Name:", 
+    #     font=("Arial", 12, "bold"), 
+    #     fill="#FFFFFF"
+    # )
+    # # Hint text (COMMENTED OUT AS PER REQUEST)
+    # canvas.create_text(
+    #     DIALOG_WIDTH // 2, TITLE_Y + 25, 
+    #     text="(Min: 4 chars, Max: 9 chars)", 
+    #     font=("Arial", 9), 
+    #     fill="#EEEEEE"
+    # )
+
+    # --- Entry Field ---
+    name_entry = tk.Entry(dialog, width=25, font=("Arial", 14)) # Adjusted width and font size
+    canvas.create_window(DIALOG_WIDTH // 2, ENTRY_Y, window=name_entry)
     name_entry.focus_set()
 
     def register_and_proceed():
+        play_click_sound() # Sound for dialog button click
         name = name_entry.get().strip()
-        
         if not name:
             messagebox.showwarning("Input Required", "Please enter a name to continue.")
         elif len(name) < 4:
@@ -913,152 +966,225 @@ def prompt_for_name():
                 dialog.destroy()
                 show_third_frame() 
 
-    tk.Button(dialog, text="Confirm & Register", command=register_and_proceed, font=("Arial", 10)).pack(pady=10)
-    dialog.bind('<Return>', lambda event: register_and_proceed())
+    # --- Register Button (Custom Image) ---
+    # Load and place the custom register button image
+    register_img_pil = load_pil_image("register.png", *BUTTON_DIMS, mode='RGBA')
+    register_img_photo = ImageTk.PhotoImage(register_img_pil)
+    canvas.register_btn_ref = register_img_photo # Keep reference
     
+    register_btn_id = canvas.create_image(
+        DIALOG_WIDTH // 2, BUTTON_Y, 
+        image=register_img_photo, 
+        anchor="center", 
+        tags="register_btn"
+    )
+
+    # Wrapped handler for the dialog image button
+    def dialog_button_handler(event=None): # Accepts optional event argument for key binding
+        register_and_proceed()
+
+    # Bindings for the custom image button
+    canvas.tag_bind("register_btn", "<Button-1>", dialog_button_handler)
+    canvas.tag_bind("register_btn", "<Enter>", lambda e: dialog.config(cursor="hand2"))
+    canvas.tag_bind("register_btn", "<Leave>", lambda e: dialog.config(cursor=""))
+    
+    # Bind the Enter key to the function
+    dialog.bind('<Return>', dialog_button_handler)
+
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
     STATE.root.wait_window(dialog)
 
 
 def show_user_selection_dialog(user_data):
-    """Pops up a dialog to allow the user to select an existing profile and offers delete/create options."""
+    """
+    Customized User Selection Dialog with userForm.png background
+    and image-based buttons for Load, Delete, and Create.
+    """
+    # --- CONFIGURATION (ADJUST THESE TO MATCH YOUR IMAGES) ---
+    DIALOG_WIDTH = 450
+    DIALOG_HEIGHT = 450
     
+    # Button Dimensions (Width, Height)
+    BTN_W, BTN_H = (180, 65) 
+    
+    # Combobox configuration
+    COMBOBOX_WIDTH = 30
+    COMBOBOX_FONT_SIZE = 14 
+    
+    # ---------------------------------------------------------
+
     dialog = tk.Toplevel(STATE.root)
     dialog.title("Manage User Profiles")
-    dialog.geometry("350x300")
+    dialog.geometry(f"{DIALOG_WIDTH}x{DIALOG_HEIGHT}")
     dialog.transient(STATE.root)
     dialog.grab_set()
     
-    dialog_x = STATE.root.winfo_x() + (STATE.root.winfo_width() // 2) - 175
-    dialog_y = STATE.root.winfo_y() + (STATE.root.winfo_height() // 2) - 150
+    # Center the dialog
+    dialog_x = STATE.root.winfo_x() + (STATE.root.winfo_width() // 2) - (DIALOG_WIDTH // 2)
+    dialog_y = STATE.root.winfo_y() + (STATE.root.winfo_height() // 2) - (DIALOG_HEIGHT // 2)
     dialog.geometry(f'+{dialog_x}+{dialog_y}')
     
+    # Create Canvas for Background and Custom Buttons
+    canvas = tk.Canvas(dialog, width=DIALOG_WIDTH, height=DIALOG_HEIGHT, highlightthickness=0, bg="#222222")
+    canvas.pack(fill="both", expand=True)
+
+    # --- 1. Load Background Image ---
+    bg_pil = load_pil_image("userForm.png", DIALOG_WIDTH, DIALOG_HEIGHT, mode='RGB')
+    bg_photo = ImageTk.PhotoImage(bg_pil)
+    canvas.create_image(0, 0, image=bg_photo, anchor="nw")
+    canvas.bg_ref = bg_photo  # Keep reference
+
+    # --- Data Setup ---
     has_users = bool(user_data)
     usernames = sorted(user_data.keys())
-    
     selected_user_var = tk.StringVar(dialog)
     if has_users:
-        selected_user_var.set(usernames[0]) 
+        selected_user_var.set(usernames[0])
 
-    # --- Load User Section ---
-    tk.Label(dialog, text="--- SELECT EXISTING USER ---", font=("Arial", 12, "bold")).pack(pady=5)
+    # --- 2. Dropdown (Combobox) ---
+    DROPDOWN_X = DIALOG_WIDTH // 2
+    DROPDOWN_Y = 195 
     
+    # --- Apply custom style for height ---
+    style = ttk.Style()
+    # Define a custom style with the larger font size
+    style.configure("Custom.TCombobox", font=("Arial", COMBOBOX_FONT_SIZE))
+    # ----------------------------------------
+
     if has_users:
-        user_menu = ttk.Combobox(dialog, textvariable=selected_user_var, values=usernames, state="readonly", width=20)
-        user_menu.pack(pady=5)
+        # Use the custom style to increase the height
+        user_menu = ttk.Combobox(dialog, 
+                                 textvariable=selected_user_var, 
+                                 values=usernames, 
+                                 state="readonly", 
+                                 width=COMBOBOX_WIDTH,
+                                 style="Custom.TCombobox" # Apply the new style
+                                )
+        canvas.create_window(DROPDOWN_X, DROPDOWN_Y, window=user_menu)
     else:
-        tk.Label(dialog, text="No existing users found.", fg="red").pack(pady=10)
+        # If no users, show text on canvas
+        canvas.create_text(DROPDOWN_X, DROPDOWN_Y, text="No users found.", fill="red", font=("Arial", 12, "bold"))
+
+    # --- Button Helpers ---
+    def create_dialog_img_button(tag, filename, x, y, handler):
+        """Helper to create a simple clickable image button on the dialog canvas."""
+        # Use the new BTN_W and BTN_H
+        img_pil = load_pil_image(filename, BTN_W, BTN_H, mode='RGBA')
+        img_photo = ImageTk.PhotoImage(img_pil)
         
-    def select_and_load():
-        if has_users:
-            username = selected_user_var.get()
-            if username in user_data:
-                STATE.user_name = username
-                STATE.selected_gender = user_data[username]
-                dialog.destroy()
-                show_third_frame()
-        else:
-            messagebox.showwarning("Selection", "Please create a new user.")
-            
-    load_btn = tk.Button(dialog, text="Load Selected User", command=select_and_load, font=("Arial", 10, "bold"), 
-                         bg="#3399FF", fg="white", state=tk.NORMAL if has_users else tk.DISABLED)
-    load_btn.pack(pady=5)
+        # Create image on canvas
+        item_id = canvas.create_image(x, y, image=img_photo, anchor="center", tags=tag)
+        
+        # Store ref
+        setattr(canvas, f"{tag}_ref", img_photo)
+        
+        # Wrapped handler for the dialog image buttons
+        def wrapped_dialog_handler(event):
+            play_click_sound() # Play sound before action
+            handler(event)
+        
+        # Bindings
+        if has_users or tag == "create_btn":
+            canvas.tag_bind(tag, "<Button-1>", wrapped_dialog_handler)
+            canvas.tag_bind(tag, "<Enter>", lambda e: dialog.config(cursor="hand2"))
+            canvas.tag_bind(tag, "<Leave>", lambda e: dialog.config(cursor=""))
 
-    # --- Delete User Functionality ---
-    def delete_selected_user():
-        if not has_users:
-            return
-
+    # --- Handlers ---
+    def on_load_click(event):
+        if not has_users: return
         username = selected_user_var.get()
-        confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to permanently delete user '{username}' and all their progress?", parent=dialog)
-        
+        if username in user_data:
+            STATE.user_name = username
+            STATE.selected_gender = user_data[username]
+            dialog.destroy()
+            show_third_frame()
+            
+    def on_delete_click(event):
+        if not has_users: return
+        username = selected_user_var.get()
+        # Note: messagebox calls don't need the click sound played before them, 
+        # as the sound will be played when the user clicks the "Delete" image button.
+        confirm = messagebox.askyesno("Confirm Delete", f"Delete user '{username}'?", parent=dialog)
         if confirm:
             if delete_user_progress(username):
-                messagebox.showinfo("Success", f"User '{username}' has been deleted.", parent=dialog)
                 dialog.destroy()
-                
-                # Re-run the main access flow to refresh the user list
+                # Refresh by calling the function again with fresh data
                 STATE.user_list = fetch_all_users()
                 show_user_selection_dialog(STATE.user_list)
-            
-    delete_btn = tk.Button(dialog, text="Delete Selected User", command=delete_selected_user, font=("Arial", 10), 
-                           bg="#FF3333", fg="white", state=tk.NORMAL if has_users else tk.DISABLED)
-    delete_btn.pack(pady=5)
 
-    tk.Frame(dialog, height=1, bg="gray").pack(fill='x', pady=10) 
+    def on_create_click(event):
+        dialog.destroy()
+        show_second_frame()
 
-    # --- Create New User Section ---
-    tk.Label(dialog, text="--- OR ---", font=("Arial", 10)).pack()
-    tk.Button(dialog, text="Create New User", command=lambda: [dialog.destroy(), show_second_frame()], font=("Arial", 10)).pack(pady=10)
+    # --- 3. Place Custom Buttons ---
+    
+    # Load User Button (Left/Center)
+    create_dialog_img_button("load_btn", "loaduser.png", x=115, y=295, handler=on_load_click)
+    
+    # Delete User Button (Right/Center)
+    create_dialog_img_button("delete_btn", "deleteuser.png", x=335, y=295, handler=on_delete_click)
+    
+    # Create User Button (Bottom)
+    create_dialog_img_button("create_btn", "createuser.png", x=DIALOG_WIDTH//2, y=385, handler=on_create_click)
 
+    # Standard window close protocol
     dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
     STATE.root.wait_window(dialog)
 
 
 def confirm_action(action, window_to_close):
-    """
-    Shows a final confirmation dialog for either Sign Out or Exit.
-    Includes reliable Pygame mixer stop/quit on Exit.
-    """
     if action == 'Sign Out':
         confirmation = messagebox.askyesno(
             "Confirm Sign Out", 
             "Are you sure you want to sign out and return to the main menu?"
         )
-    else: # Exit
+    else: 
         confirmation = messagebox.askyesno(
             "Confirm Exit", 
             "Are you sure you want to exit the application?"
         )
 
     if confirmation:
+        # Play sound before action that closes window
+        play_click_sound() 
         if action == 'Exit':
-            # Ensure Pygame mixer is explicitly stopped and quit on EXIT
             try:
                 pygame.mixer.music.stop()
                 pygame.mixer.quit() 
             except Exception as e:
                 print(f"Warning: Pygame mixer quit failed: {e}")
                 pass 
-
             if window_to_close:
                 window_to_close.destroy()
             STATE.root.destroy()
-        
         elif action == 'Sign Out':
-            # Ensure root window is visible when returning to main menu
             if window_to_close:
                 window_to_close.destroy()
-            
-            # This is important if root was hidden by landscape window (.withdraw())
             STATE.root.deiconify() 
             create_main_menu()
             
 def on_nav_exit_click(landscape_window):
-    """
-    Handles the exit button click on the dashboard by confirming sign out.
-    """
+    # Play sound when confirming navigation exit
+    play_click_sound()
     confirm_action('Sign Out', landscape_window)
 
 
 # ---------------------------------------------------------
-# CLICK HANDLERS
+# CLICK HANDLERS (Updated to ensure sound is played once via the wrapper function in create_pulsing_button)
 # ---------------------------------------------------------
 def on_access_game_click(event):
-    """Fetches user list and opens selection dialog."""
     STATE.user_list = fetch_all_users()
     show_user_selection_dialog(STATE.user_list)
 
 def on_exit_click(event=None):
-    """Handles the exit button click on the main menu (Frame 1)."""
+    # Play sound when confirming exit
+    play_click_sound()
     confirm_action('Exit', None)
 
-
 def on_gender_click(gender):
-    """Handles gender selection/deselection on Frame 2."""
+    play_click_sound() # Sound for gender selection/deselection
     is_deselecting = (STATE.selected_gender == gender)
     STATE.selected_gender = None if is_deselecting else gender
-    
     if STATE.selected_gender:
         STATE.gender_label.config(text=f"Gender Selected: {gender}")
         STATE.gender_label.place(relx=0.5, rely=0.42, anchor="center") 
@@ -1068,7 +1194,6 @@ def on_gender_click(gender):
         STATE.gender_label.place_forget() 
 
 def on_next_char_click(event):
-    """Proceeds from Frame 2 to register a new user name."""
     prompt_for_name()
 
 
@@ -1098,11 +1223,8 @@ if __name__ == "__main__":
     except Exception as e:
         pass
 
-    # Music
     music_path = os.path.join(ASSETS_DIR, "bgmusic.mp3") 
     start_music(music_path)
     
-    # Start app flow
     create_main_menu()
-    
     root.mainloop()
