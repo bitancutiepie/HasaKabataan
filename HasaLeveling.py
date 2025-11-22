@@ -46,6 +46,17 @@ TUTORIAL_ICON_X = 240
 TUTORIAL_ICON_Y = 455 
 TUTORIAL_ICON_DIMS = (160, 203)
 
+# --- PROBLEM SOLVER BUTTON CONSTANTS ---
+REVEAL_ANSWER_DIMS = (240, 130)
+REVEAL_ANSWER_COORDS = (740, 530)
+
+BACK_PROBLEM_DIMS = (220, 110)
+BACK_PROBLEM_COORDS = (160, 580)
+
+# --- ANSWER FRAME BUTTON CONSTANTS (New) ---
+ADDSKILL_BUTTON_DIMS = (220, 110)
+ADDSKILL_BUTTON_COORDS = (1255, 597)
+
 # --- TUTORIAL YOUTUBE LINKS ---
 TUTORIAL_LINKS = {
     "Python": {
@@ -142,12 +153,13 @@ class AppState:
         self.bg_ref = None 
         self.initial_volume = 50.0
         self.banner_char_ref = None 
-        self.skill_bar_refs = []
+        self.skill_bar_refs = [] 
         self.db_progress_data = {} 
         self.user_list = {}
         self.tutorial_icon_ref = None
         self.current_tutorial_skill = None 
-        self.click_sound = None # NEW: Reference for the click sound
+        self.click_sound = None 
+        self.current_problem_number = None 
         
 STATE = AppState()
 
@@ -171,15 +183,14 @@ def fetch_all_users():
     conn = get_db_connection()
     if not conn:
         return {}
-    user_data = {}
     try:
         cursor = conn.cursor()
         query = "SELECT username, gender FROM user_progress"
         cursor.execute(query)
-        for (username, gender) in cursor:
-            user_data[username] = gender
+        user_data = {username: gender for (username, gender) in cursor}
     except mysql.connector.Error as err:
         print(f"Database Query Error: {err}")
+        user_data = {}
     finally:
         if conn and conn.is_connected():
             cursor.close()
@@ -217,6 +228,45 @@ def get_user_progress(username):
             cursor.close()
             conn.close()
 
+# NEW FUNCTION: Update user progress by a specified amount
+def update_user_progress(username, db_key, increment):
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    # Map the display skill name to the database column name (db_key)
+    skill_map = {
+        "HTML": "html_progress",
+        "C++": "cplusplus_progress",
+        "MySQL": "mysql_progress",
+        "Python": "python_progress",
+        "Java": "java_progress"
+    }
+    column_name = skill_map.get(db_key)
+    if not column_name:
+        print(f"Error: Invalid skill name provided: {db_key}")
+        return False
+        
+    try:
+        cursor = conn.cursor()
+        # Ensure progress doesn't exceed 1.0 (100%)
+        # This SQL statement gets the current value, adds the increment, and then caps it at 1.0
+        update_query = f"""
+        UPDATE user_progress 
+        SET {column_name} = LEAST({column_name} + %s, 1.0) 
+        WHERE username = %s
+        """
+        cursor.execute(update_query, (increment, username.upper()))
+        conn.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        messagebox.showerror("Database Error", f"Failed to update progress for {db_key}: {err}")
+        return False
+    finally:
+        if conn and conn.is_connected():
+            cursor.close()
+            conn.close()
+
 def insert_new_user(username, gender):
     conn = get_db_connection()
     if not conn:
@@ -225,7 +275,7 @@ def insert_new_user(username, gender):
         cursor = conn.cursor()
         insert_query = """
         INSERT INTO user_progress (username, gender, html_progress, cplusplus_progress, mysql_progress, python_progress, java_progress)
-        VALUES (%s, %s, 0.10, 0.10, 0.10, 0.10, 0.10)
+        VALUES (%s, %s, 0.00, 0.00, 0.00, 0.00, 0.00)
         """
         cursor.execute(insert_query, (username.upper(), gender))
         conn.commit()
@@ -554,6 +604,7 @@ def clear_current_frame():
     STATE.banner_char_ref = None 
     STATE.skill_bar_refs = [] 
     STATE.tutorial_icon_ref = None 
+    STATE.current_problem_number = None 
 
 def on_tutorial_nav_click(event):
     if STATE.current_tutorial_skill:
@@ -563,11 +614,13 @@ def on_tutorial_nav_click(event):
 
 def create_nav_buttons(canvas, win):
     NAV_BAR_Y_CENTER = 730 
+    
+    # MODIFIED COORDINATES FOR BETTER SPACING: (343, 563, 783, 1003)
     NAV_BUTTONS = [
-        {"tag": "homenav_btn", "path": "homenav.png", "dims": (52, 65), "coords": (371, NAV_BAR_Y_CENTER), "handler": lambda e: show_third_frame()},
-        {"tag": "tutorialnav_btn", "path": "tutorialnav.png", "dims": (82, 60), "coords": (545, NAV_BAR_Y_CENTER), "handler": on_tutorial_nav_click}, 
-        {"tag": "problemsnav_btn", "path": "problemsnav.png", "dims": (84, 60), "coords": (761, NAV_BAR_Y_CENTER), "handler": lambda e: show_fifth_frame()},
-        {"tag": "exitnav_btn", "path": "exitnav.png", "dims": (73, 65), "coords": (961, NAV_BAR_Y_CENTER), "handler": lambda e: on_nav_exit_click(win)},
+        {"tag": "homenav_btn", "path": "homenav.png", "dims": (52, 65), "coords": (343, NAV_BAR_Y_CENTER), "handler": lambda e: show_third_frame()},
+        {"tag": "tutorialnav_btn", "path": "tutorialnav.png", "dims": (82, 60), "coords": (563, NAV_BAR_Y_CENTER), "handler": on_tutorial_nav_click}, 
+        {"tag": "problemsnav_btn", "path": "problemsnav.png", "dims": (84, 60), "coords": (783, NAV_BAR_Y_CENTER), "handler": lambda e: show_fifth_frame()},
+        {"tag": "exitnav_btn", "path": "exitnav.png", "dims": (73, 65), "coords": (1003, NAV_BAR_Y_CENTER), "handler": lambda e: on_nav_exit_click(win)},
     ]
     for btn in NAV_BUTTONS:
         # Note: If is_active is True, the click handler is bound directly inside create_pulsing_button 
@@ -768,18 +821,187 @@ def show_fourth_frame(skill_name=None):
             
     create_nav_buttons(canvas, win)
 
-# --- NEW FUNCTION: PROBLEM SOLVER PLACEHOLDER ---
+
+# --- MODIFIED FUNCTION: ADDSKILL CLICK HANDLER ---
+def on_add_skill_click(skill_name, problem_number):
+    """
+    Updates user progress by adding 20% (0.20) to the specified skill
+    and navigates back to the Dashboard to show the new progress.
+    """
+    increment = 0.20 # 20%
+    if STATE.user_name and skill_name:
+        if update_user_progress(STATE.user_name, skill_name, increment):
+            messagebox.showinfo(
+                "Skill Added!", 
+                f"Congratulations! **{skill_name}** progress updated by 20% for completing Problem #{problem_number}!"
+            )
+            # After successful update, go back to the Dashboard (Frame 3) to refresh progress bars
+            show_third_frame()
+        else:
+            messagebox.showerror(
+                "Update Failed",
+                f"Could not update progress for {skill_name}. Check database connection."
+            )
+    else:
+         messagebox.showerror(
+            "Error",
+            "Missing user or skill data. Cannot update progress."
+        )
+
+
+# --- MODIFIED FUNCTION: PROBLEM SOLVER REVEAL CLICK ---
+def on_reveal_answer_click(skill, problem_number):
+    """Handles the Reveal Answer button click by showing the answer frame."""
+    show_answer_frame(skill, problem_number)
+
+
 def open_problem_solver(skill, problem_number):
     """
-    Placeholder: This handles what happens when a folder is clicked.
-    Example: Open a window showing 'Java Problem #1'
+    This handles what happens when a folder is clicked.
+    Routes to the specific problem frame.
     """
-    print(f"Opening {skill} Problem #{problem_number}...")
-    messagebox.showinfo("Problem Selected", f"You opened {skill} Problem Folder #{problem_number}")
-    # Later, you can add logic here to open a specific image or window.
+    STATE.current_problem_number = problem_number
+    
+    # MODIFIED: Route all skills to the solver frame for easier development
+    show_problem_solver_frame(skill, problem_number)
 
 
-# --- NEW FRAME: PROBLEM SELECTION ---
+# --- NEW FRAME: ANSWER SOLVER VIEW (Frame 8) ---
+def show_answer_frame(skill_name, problem_number):
+    """
+    Frame 8: Answer View (The answer image is displayed here)
+    """
+    def close_handler():
+        STATE.landscape_window.destroy()
+        create_main_menu() 
+    
+    # Create Window
+    title = f"Hasa Leveling - {skill_name} Answer {problem_number}"
+    win, canvas = create_landscape_window(title, close_handler)
+    
+    # --- Background Image Logic (answercX.png) ---
+    skill_abbr_map = {
+        "C++": "c", "Python": "python", "Java": "java", "HTML": "html", "MySQL": "mysql"
+    }
+    
+    skill_abbr = skill_abbr_map.get(skill_name, "c") 
+    
+    # File naming convention: answerc1.png, answerj1.png, etc.
+    bg_filename = f"answer{skill_abbr}{problem_number}.png"
+    
+    try:
+        bg_image = load_pil_image(bg_filename, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, mode='RGB')
+    except Exception:
+        # Fallback
+        bg_filename = "problemsbg.png" 
+        bg_image = load_pil_image(bg_filename, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, mode='RGB')
+        messagebox.showwarning("Image Missing", f"Could not load specific answer background: {bg_filename}. Using generic problem background.")
+        
+    bg_photo = ImageTk.PhotoImage(bg_image)
+    canvas.create_image(0, 0, image=bg_photo, anchor="nw")
+    STATE.bg_ref = bg_photo 
+    
+    # ---------------------------------------------------------
+    # 1. Back Button (Same dimensions/place as question frame's back button)
+    # ---------------------------------------------------------
+    create_pulsing_button(
+        canvas, 
+        "back_answer_btn", 
+        "problemback.png", 
+        BACK_PROBLEM_DIMS, 
+        BACK_PROBLEM_COORDS, 
+        # Back button returns to the question frame
+        lambda e: show_problem_solver_frame(skill_name, problem_number)
+    )
+
+    # ---------------------------------------------------------
+    # 2. Add Skill Button (New)
+    # ---------------------------------------------------------
+    create_pulsing_button(
+        canvas, 
+        "add_skill_btn", 
+        "addskill.png", 
+        ADDSKILL_BUTTON_DIMS, 
+        ADDSKILL_BUTTON_COORDS, 
+        lambda e: on_add_skill_click(skill_name, problem_number)
+    )
+
+    # ---------------------------------------------------------
+    # Navigation Bar 
+    create_nav_buttons(canvas, win)
+
+
+# --- MODIFIED FRAME: PROBLEM SOLVER VIEW (Frame 7) ---
+def show_problem_solver_frame(skill_name, problem_number):
+    """
+    Frame 7: Problem Solving View (The actual question is displayed here)
+    """
+    def close_handler():
+        STATE.landscape_window.destroy()
+        create_main_menu() 
+    
+    # Create Window
+    title = f"Hasa Leveling - {skill_name} Problem {problem_number}"
+    win, canvas = create_landscape_window(title, close_handler)
+    
+    # --- Background Image Logic (REFINED) ---
+    # Map skill name to filename abbreviation
+    skill_abbr_map = {
+        "C++": "c",
+        "Python": "python",
+        "Java": "java",
+        "HTML": "html",
+        "MySQL": "mysql"
+    }
+    
+    skill_abbr = skill_abbr_map.get(skill_name, "c") 
+    
+    # File naming convention: questionc1.png, questionj1.png, etc.
+    bg_filename = f"question{skill_abbr}{problem_number}.png"
+    
+    try:
+        bg_image = load_pil_image(bg_filename, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, mode='RGB')
+    except Exception:
+        # Fallback in case the specific image is missing
+        bg_filename = "problemsbg.png" 
+        bg_image = load_pil_image(bg_filename, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, mode='RGB')
+        messagebox.showwarning("Image Missing", f"Could not load specific background: {bg_filename}. Using generic problem background.")
+        
+    bg_photo = ImageTk.PhotoImage(bg_image)
+    canvas.create_image(0, 0, image=bg_photo, anchor="nw")
+    STATE.bg_ref = bg_photo 
+    
+    # ---------------------------------------------------------
+    # 1. Reveal Answer Button (FILE NAME CORRECTED)
+    # ---------------------------------------------------------
+    create_pulsing_button(
+        canvas, 
+        "reveal_answer_btn", 
+        "revealbutton.png", # CORRECTED FILENAME
+        REVEAL_ANSWER_DIMS, 
+        REVEAL_ANSWER_COORDS, 
+        # Calls the updated handler
+        lambda e: on_reveal_answer_click(skill_name, problem_number)
+    )
+
+    # ---------------------------------------------------------
+    # 2. Back Button
+    # ---------------------------------------------------------
+    create_pulsing_button(
+        canvas, 
+        "back_problem_btn", 
+        "problemback.png", 
+        BACK_PROBLEM_DIMS, 
+        BACK_PROBLEM_COORDS, 
+        lambda e: show_problem_selection_frame(skill_name)
+    )
+
+    # ---------------------------------------------------------
+    # Navigation Bar 
+    create_nav_buttons(canvas, win)
+
+
+# --- NEW FRAME: PROBLEM SELECTION (Frame 6) ---
 def show_problem_selection_frame(skill_name):
     """
     Frame 6: Problem Selection View (Folders)
@@ -902,13 +1124,13 @@ def prompt_for_name():
         return
 
     # --- CONFIGURATION FOR NAME INPUT DIALOG ---
-    DIALOG_WIDTH = 350 # Increased width
-    DIALOG_HEIGHT = 300 # Increased height
+    DIALOG_WIDTH = 350 
+    DIALOG_HEIGHT = 300 
     
     # Coordinates relative to the dialog canvas
-    ENTRY_Y = 175 # Adjusted Y position for the entry field
-    BUTTON_Y = 245 # Adjusted Y position for the register button
-    BUTTON_DIMS = (180, 65) # Adjusted dimensions for the register.png button
+    ENTRY_Y = 175 
+    BUTTON_Y = 245 
+    BUTTON_DIMS = (180, 65) 
     # -------------------------------------------
 
     dialog = tk.Toplevel(STATE.root)
@@ -929,30 +1151,15 @@ def prompt_for_name():
     bg_pil = load_pil_image("registerForm.png", DIALOG_WIDTH, DIALOG_HEIGHT, mode='RGB')
     bg_photo = ImageTk.PhotoImage(bg_pil)
     canvas.create_image(0, 0, image=bg_photo, anchor="nw")
-    canvas.bg_ref = bg_photo  # Keep reference
-
-    # --- Title Text (COMMENTED OUT AS PER REQUEST) ---
-    # canvas.create_text(
-    #     DIALOG_WIDTH // 2, TITLE_Y, 
-    #     text="Input NEW Character Name:", 
-    #     font=("Arial", 12, "bold"), 
-    #     fill="#FFFFFF"
-    # )
-    # # Hint text (COMMENTED OUT AS PER REQUEST)
-    # canvas.create_text(
-    #     DIALOG_WIDTH // 2, TITLE_Y + 25, 
-    #     text="(Min: 4 chars, Max: 9 chars)", 
-    #     font=("Arial", 9), 
-    #     fill="#EEEEEE"
-    # )
+    canvas.bg_ref = bg_photo 
 
     # --- Entry Field ---
-    name_entry = tk.Entry(dialog, width=25, font=("Arial", 14)) # Adjusted width and font size
+    name_entry = tk.Entry(dialog, width=25, font=("Arial", 14)) 
     canvas.create_window(DIALOG_WIDTH // 2, ENTRY_Y, window=name_entry)
     name_entry.focus_set()
 
     def register_and_proceed():
-        play_click_sound() # Sound for dialog button click
+        play_click_sound() 
         name = name_entry.get().strip()
         if not name:
             messagebox.showwarning("Input Required", "Please enter a name to continue.")
@@ -970,7 +1177,7 @@ def prompt_for_name():
     # Load and place the custom register button image
     register_img_pil = load_pil_image("register.png", *BUTTON_DIMS, mode='RGBA')
     register_img_photo = ImageTk.PhotoImage(register_img_pil)
-    canvas.register_btn_ref = register_img_photo # Keep reference
+    canvas.register_btn_ref = register_img_photo 
     
     register_btn_id = canvas.create_image(
         DIALOG_WIDTH // 2, BUTTON_Y, 
@@ -980,7 +1187,7 @@ def prompt_for_name():
     )
 
     # Wrapped handler for the dialog image button
-    def dialog_button_handler(event=None): # Accepts optional event argument for key binding
+    def dialog_button_handler(event=None): 
         register_and_proceed()
 
     # Bindings for the custom image button
@@ -1170,7 +1377,7 @@ def on_nav_exit_click(landscape_window):
 
 
 # ---------------------------------------------------------
-# CLICK HANDLERS (Updated to ensure sound is played once via the wrapper function in create_pulsing_button)
+# CLICK HANDLERS
 # ---------------------------------------------------------
 def on_access_game_click(event):
     STATE.user_list = fetch_all_users()
@@ -1182,7 +1389,7 @@ def on_exit_click(event=None):
     confirm_action('Exit', None)
 
 def on_gender_click(gender):
-    play_click_sound() # Sound for gender selection/deselection
+    play_click_sound() 
     is_deselecting = (STATE.selected_gender == gender)
     STATE.selected_gender = None if is_deselecting else gender
     if STATE.selected_gender:
