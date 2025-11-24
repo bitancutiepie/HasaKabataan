@@ -3,7 +3,6 @@ from tkinter import messagebox, ttk
 from PIL import Image, ImageTk
 import os
 import pygame
-import json
 import mysql.connector
 import webbrowser 
 
@@ -55,7 +54,13 @@ BACK_PROBLEM_COORDS = (160, 580)
 
 # --- ANSWER FRAME BUTTON CONSTANTS (New) ---
 ADDSKILL_BUTTON_DIMS = (220, 110)
-ADDSKILL_BUTTON_COORDS = (1255, 597)
+ADDSKILL_BUTTON_COORDS = (1255, 625)
+
+# --- QOL ADDITION: LANDSCAPE USERNAME DISPLAY ---
+LANDSCAPE_USERNAME_X = LANDSCAPE_WIDTH - 50 # Near the right edge
+LANDSCAPE_USERNAME_Y = 30 # Near the top
+LANDSCAPE_USERNAME_FONT = ("Arial Black", 16, "bold")
+
 
 # --- TUTORIAL YOUTUBE LINKS ---
 TUTORIAL_LINKS = {
@@ -200,10 +205,13 @@ def fetch_all_users():
 def get_user_progress(username):
     conn = get_db_connection()
     if not conn:
+        # NOTE: This fallback is good, but it's important to use the same logic 
+        # as the default values for a new user if the DB is down.
+        # Returning 0.10 for consistency with new user insert fallback.
         return {
-            "html_progress": 0.50, "cplusplus_progress": 0.50, 
-            "mysql_progress": 0.50, "python_progress": 0.50, 
-            "java_progress": 0.50, "status": "default_used"
+            "html_progress": 0.10, "cplusplus_progress": 0.10, 
+            "mysql_progress": 0.10, "python_progress": 0.10, 
+            "java_progress": 0.10, "status": "default_used"
         }
 
     try:
@@ -218,6 +226,7 @@ def get_user_progress(username):
             STATE.selected_gender = data['gender']
             return progress_data
         
+        # Fallback for existing user not found (shouldn't happen if called correctly)
         return {key: 0.10 for key in ["html_progress", "cplusplus_progress", "mysql_progress", "python_progress", "java_progress"]}
 
     except mysql.connector.Error as err:
@@ -235,6 +244,9 @@ def update_user_progress(username, db_key, increment):
         return False
     
     # Map the display skill name to the database column name (db_key)
+    # The original function signature takes the display name, but the internal logic uses db_key
+    # The 'db_key' in the original implementation was the display name (e.g., "Python").
+    # For this function to work correctly, we map the display name to the column name.
     skill_map = {
         "HTML": "html_progress",
         "C++": "cplusplus_progress",
@@ -242,7 +254,7 @@ def update_user_progress(username, db_key, increment):
         "Python": "python_progress",
         "Java": "java_progress"
     }
-    column_name = skill_map.get(db_key)
+    column_name = skill_map.get(db_key) # db_key here is actually the skill_name (e.g., "Python")
     if not column_name:
         print(f"Error: Invalid skill name provided: {db_key}")
         return False
@@ -273,9 +285,10 @@ def insert_new_user(username, gender):
         return False
     try:
         cursor = conn.cursor()
+        # Start new users with 0.10 (10%) progress as per your default/fallback values
         insert_query = """
         INSERT INTO user_progress (username, gender, html_progress, cplusplus_progress, mysql_progress, python_progress, java_progress)
-        VALUES (%s, %s, 0.00, 0.00, 0.00, 0.00, 0.00)
+        VALUES (%s, %s, 0.10, 0.10, 0.10, 0.10, 0.10)
         """
         cursor.execute(insert_query, (username.upper(), gender))
         conn.commit()
@@ -323,10 +336,12 @@ def log_coordinates(event):
 def load_pil_image(filename, width, height, mode='RGBA'):
     path = os.path.join(ASSETS_DIR, filename)
     if not os.path.exists(path):
+        # QoL Addition: Better visual for missing asset
         placeholder = Image.new(mode, (width, height), color='red')
         from PIL import ImageDraw
         draw = ImageDraw.Draw(placeholder)
-        draw.text((10, 10), filename, fill=(255, 255, 255))
+        draw.text((10, 10), f"MISSING:\n{filename}", fill=(255, 255, 255))
+        print(f"Warning: Asset not found: {path}")
         return placeholder
     img = Image.open(path).convert(mode)
     return img.resize((width, height), Image.Resampling.LANCZOS) 
@@ -397,7 +412,7 @@ def play_click_sound():
             STATE.click_sound.play()
         except pygame.error as e:
             # Handle cases where mixer might be busy or sound object is invalid
-            print(f"Warning: Could not play click sound: {e}")
+            # print(f"Warning: Could not play click sound: {e}")
             pass
     else:
         # Load the sound if it hasn't been loaded yet
@@ -457,9 +472,7 @@ def pulse(tag):
     data["job"] = STATE.root.after(15, lambda: pulse(tag))
 
 def on_enter(event, tag):
-    if tag == "next_btn" and STATE.selected_gender is None:
-        STATE.root.config(cursor="arrow")
-        return
+    # REMOVED: check for next_btn and STATE.selected_gender here to allow pulse
     STATE.root.config(cursor="hand2")
     data = STATE.button_data.get(tag)
     if data:
@@ -474,19 +487,31 @@ def on_leave(event, tag):
     if data:
         data["hover"] = False
 
-def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler, is_active=False):
+def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler, disable_pulse=False):
+    """
+    Creates an image button that pulses on hover unless disable_pulse is True.
+    """
     w, h = dims
     pil_base = load_pil_image(filename, round(w), round(h), mode='RGBA') 
     photo = ImageTk.PhotoImage(pil_base)
     
     canvas.create_image(*coords, image=photo, anchor="center", tags=tag)
     
-    STATE.button_data[tag] = { "base_img": pil_base, "scale": 1.0, "growing": True, 
-                                "hover": False, "job": None, "current_photo": photo }
+    # Check if a reference for this photo is already stored (from a previous frame)
+    # If not, create the ref to prevent garbage collection
+    if not hasattr(canvas, f"{tag}_img_ref"):
+        setattr(canvas, f"{tag}_img_ref", photo) 
+
+    if not disable_pulse:
+        STATE.button_data[tag] = { "base_img": pil_base, "scale": 1.0, "growing": True, 
+                                    "hover": False, "job": None, "current_photo": photo }
+    else:
+        # Still need to initialize data to allow the basic cursor change logic to work
+        STATE.button_data[tag] = { "base_img": pil_base, "scale": 1.0, "growing": False, 
+                                    "hover": False, "job": None, "current_photo": photo }
+
     
-    setattr(canvas, f"{tag}_img_ref", photo) 
-    
-    if not is_active:
+    if not disable_pulse:
         canvas.tag_bind(tag, "<Enter>", lambda e: on_enter(e, tag))
         canvas.tag_bind(tag, "<Leave>", lambda e: on_leave(e, tag))
         
@@ -497,8 +522,8 @@ def create_pulsing_button(canvas, tag, filename, dims, coords, click_handler, is
             
         canvas.tag_bind(tag, "<Button-1>", wrapped_handler)
     else:
-        # For non-interactive buttons (like dashboard icons that navigate back)
-        # We still want the hand cursor for visual feedback, but no pulse animation
+        # For non-interactive buttons (like dashboard icons that navigate back) 
+        # that should not pulse, but still need the hand cursor.
         canvas.tag_bind(tag, "<Enter>", lambda e: STATE.root.config(cursor="hand2"))
         canvas.tag_bind(tag, "<Leave>", lambda e: STATE.root.config(cursor=""))
         canvas.tag_bind(tag, "<Button-1>", lambda e: (play_click_sound(), click_handler(e)))
@@ -523,8 +548,10 @@ def start_music(music_file_path):
         pygame.mixer.music.play(-1)
         STATE.initial_volume = pygame.mixer.music.get_volume() * 100
     except pygame.error as e:
+        # print(f"Warning: Pygame music error: {e}")
         pass
     except Exception as e:
+        # print(f"Warning: Unexpected music error: {e}")
         pass
 
 def create_volume_slider(parent_window, is_portrait):
@@ -623,9 +650,8 @@ def create_nav_buttons(canvas, win):
         {"tag": "exitnav_btn", "path": "exitnav.png", "dims": (73, 65), "coords": (1003, NAV_BAR_Y_CENTER), "handler": lambda e: on_nav_exit_click(win)},
     ]
     for btn in NAV_BUTTONS:
-        # Note: If is_active is True, the click handler is bound directly inside create_pulsing_button 
-        # using the (play_click_sound(), click_handler(e)) tuple for simplicity and ensuring sound plays.
-        create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], btn["handler"], is_active=False)
+        # disable_pulse is False by default, enabling the pulse animation for navigation buttons
+        create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], btn["handler"], disable_pulse=False)
 
 
 def create_main_menu():
@@ -685,6 +711,7 @@ def show_second_frame():
         create_pulsing_button(canvas, char["tag"], char["path"], CHAR_DIMS, char["coords"], handler)
         
     NEXT_DIMS = (249, 120)
+    # Ensure next_btn also uses the pulsing feature
     create_pulsing_button(canvas, "next_btn", "nextChar.png", NEXT_DIMS, (263, 850), on_next_char_click)
     
     STATE.gender_label = tk.Label(canvas, text="", font=("Arial", 16, "bold"), 
@@ -692,6 +719,7 @@ def show_second_frame():
     create_volume_slider(STATE.root, is_portrait=True)
 
 
+# MODIFIED: Added user_name display
 def create_landscape_window(title, close_handler):
     clear_current_frame()
     STATE.root.withdraw() 
@@ -718,6 +746,17 @@ def create_landscape_window(title, close_handler):
     STATE.current_canvas = canvas 
     canvas.bind("<Button-1>", log_coordinates)
     create_volume_slider(win, is_portrait=False) 
+
+    # QoL Addition: Display user name on top right for context
+    if STATE.user_name:
+        canvas.create_text(
+            LANDSCAPE_USERNAME_X, LANDSCAPE_USERNAME_Y, 
+            text=f"USER: {STATE.user_name.upper()}", 
+            font=LANDSCAPE_USERNAME_FONT, 
+            fill="#FFFFFF", 
+            anchor="e"
+        )
+
     return win, canvas
 
 def show_third_frame():
@@ -806,6 +845,7 @@ def show_fourth_frame(skill_name=None):
     if skill_name:
         skill_filename = f"tut{skill_name.lower().replace('+', '')}.png"
         # Now using create_pulsing_button for hover effect
+        # Set disable_pulse=True here if you don't want the skill icon to pulse
         create_pulsing_button(
             canvas, 
             "tutorial_skill_icon", 
@@ -817,7 +857,8 @@ def show_fourth_frame(skill_name=None):
 
     for btn in PLAY_BUTTONS_CONFIG:
         handler = lambda e, num=btn["button_num"]: open_tutorial_link(num)
-        create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], handler, is_active=False)
+        # Ensure play buttons use the pulsing feature
+        create_pulsing_button(canvas, btn["tag"], btn["path"], btn["dims"], btn["coords"], handler, disable_pulse=False)
             
     create_nav_buttons(canvas, win)
 
@@ -840,7 +881,7 @@ def on_add_skill_click(skill_name, problem_number):
         else:
             messagebox.showerror(
                 "Update Failed",
-                f"Could not update progress for {skill_name}. Check database connection."
+                f"Could not update progress for {skill_name}. Check database connection or if the progress is already 100%."
             )
     else:
          messagebox.showerror(
@@ -917,14 +958,28 @@ def show_answer_frame(skill_name, problem_number):
     # ---------------------------------------------------------
     # 2. Add Skill Button (New)
     # ---------------------------------------------------------
-    create_pulsing_button(
-        canvas, 
-        "add_skill_btn", 
-        "addskill.png", 
-        ADDSKILL_BUTTON_DIMS, 
-        ADDSKILL_BUTTON_COORDS, 
-        lambda e: on_add_skill_click(skill_name, problem_number)
-    )
+    # QoL Improvement: Only allow adding skill if progress is < 1.0 (100%)
+    current_progress = STATE.db_progress_data.get(skill_name.lower().replace('+', '') + "_progress", 0.0)
+    
+    if current_progress < 1.0:
+        create_pulsing_button(
+            canvas, 
+            "add_skill_btn", 
+            "addskill.png", 
+            ADDSKILL_BUTTON_DIMS, 
+            ADDSKILL_BUTTON_COORDS, 
+            lambda e: on_add_skill_click(skill_name, problem_number)
+        )
+    else:
+        # QoL: Show a disabled/different button or just text if skill is maxed
+        canvas.create_text(
+            ADDSKILL_BUTTON_COORDS[0], ADDSKILL_BUTTON_COORDS[1], 
+            text="SKILL MAXED!", 
+            font=("Arial", 18, "bold"), 
+            fill="#FFD700",
+            anchor="center"
+        )
+
 
     # ---------------------------------------------------------
     # Navigation Bar 
@@ -1035,6 +1090,15 @@ def show_problem_selection_frame(skill_name):
         TUTORIAL_ICON_DIMS, 
         (TUTORIAL_ICON_X, TUTORIAL_ICON_Y), 
         lambda e: show_fifth_frame()
+    )
+
+    # QoL Addition: Explicitly state the skill name under the icon
+    canvas.create_text(
+        TUTORIAL_ICON_X, TUTORIAL_ICON_Y + TUTORIAL_ICON_DIMS[1] // 2 + 20, 
+        text=f"{skill_name} Problems", 
+        font=("Arial Black", 18, "bold"), 
+        fill="#FFD700",
+        anchor="center"
     )
     
     # ---------------------------------------------------------
@@ -1152,6 +1216,65 @@ def prompt_for_name():
     bg_photo = ImageTk.PhotoImage(bg_pil)
     canvas.create_image(0, 0, image=bg_photo, anchor="nw")
     canvas.bg_ref = bg_photo 
+    
+    # --- Custom Pulse Logic for Dialog ---
+    canvas.dialog_button_data = {}
+
+    def pulse_dialog(tag):
+        data = canvas.dialog_button_data.get(tag)
+        if not data: return
+        
+        STEP = 0.002
+        MIN_SCALE = 1.00 
+        MAX_SCALE = 1.05 
+        canvas_ref = canvas
+        
+        if data["hover"]:
+            if data["growing"]:
+                data["scale"] = min(MAX_SCALE, data["scale"] + STEP)
+                if data["scale"] >= MAX_SCALE: data["growing"] = False
+            else:
+                data["scale"] = max(MIN_SCALE, data["scale"] - STEP)
+                if data["scale"] <= MIN_SCALE: data["growing"] = True
+        else:
+            data["scale"] = max(MIN_SCALE, data["scale"] - STEP)
+            
+        if not data["hover"] and data["scale"] == MIN_SCALE:
+            if data["job"]:
+                dialog.after_cancel(data["job"])
+                data["job"] = None
+            new_photo = ImageTk.PhotoImage(data["base_img"])
+            canvas_ref.itemconfig(tag, image=new_photo)
+            data["current_photo"] = new_photo
+            return
+
+        original_w, original_h = data["base_img"].size
+        new_w = int(original_w * data["scale"])
+        new_h = int(original_h * data["scale"])
+        
+        resized_pil = data["base_img"].resize((new_w, new_h), Image.Resampling.BILINEAR)
+        new_photo = ImageTk.PhotoImage(resized_pil)
+        
+        canvas_ref.itemconfig(tag, image=new_photo)
+        data["current_photo"] = new_photo
+        
+        data["job"] = dialog.after(15, lambda: pulse_dialog(tag))
+
+    def dialog_on_enter(event, tag): 
+        dialog.config(cursor="hand2")
+        data = canvas.dialog_button_data.get(tag)
+        if data:
+            data["hover"] = True
+            if data["job"] is None:
+                data["growing"] = True 
+                pulse_dialog(tag)
+
+    def dialog_on_leave(event, tag):
+        dialog.config(cursor="")
+        data = canvas.dialog_button_data.get(tag)
+        if data:
+            data["hover"] = False
+    # --- End Custom Pulse Logic ---
 
     # --- Entry Field ---
     name_entry = tk.Entry(dialog, width=25, font=("Arial", 14)) 
@@ -1174,7 +1297,6 @@ def prompt_for_name():
                 show_third_frame() 
 
     # --- Register Button (Custom Image) ---
-    # Load and place the custom register button image
     register_img_pil = load_pil_image("register.png", *BUTTON_DIMS, mode='RGBA')
     register_img_photo = ImageTk.PhotoImage(register_img_pil)
     canvas.register_btn_ref = register_img_photo 
@@ -1186,14 +1308,20 @@ def prompt_for_name():
         tags="register_btn"
     )
 
+    # Setup data for pulse
+    canvas.dialog_button_data["register_btn"] = { 
+        "base_img": register_img_pil, "scale": 1.0, "growing": True, 
+        "hover": False, "job": None, "current_photo": register_img_photo 
+    }
+    
     # Wrapped handler for the dialog image button
     def dialog_button_handler(event=None): 
         register_and_proceed()
 
-    # Bindings for the custom image button
+    # Bindings for the custom image button with pulse
     canvas.tag_bind("register_btn", "<Button-1>", dialog_button_handler)
-    canvas.tag_bind("register_btn", "<Enter>", lambda e: dialog.config(cursor="hand2"))
-    canvas.tag_bind("register_btn", "<Leave>", lambda e: dialog.config(cursor=""))
+    canvas.tag_bind("register_btn", "<Enter>", lambda e: dialog_on_enter(e, "register_btn"))
+    canvas.tag_bind("register_btn", "<Leave>", lambda e: dialog_on_leave(e, "register_btn"))
     
     # Bind the Enter key to the function
     dialog.bind('<Return>', dialog_button_handler)
@@ -1240,6 +1368,66 @@ def show_user_selection_dialog(user_data):
     bg_photo = ImageTk.PhotoImage(bg_pil)
     canvas.create_image(0, 0, image=bg_photo, anchor="nw")
     canvas.bg_ref = bg_photo  # Keep reference
+    
+    # --- Custom Pulse Logic for Dialog ---
+    canvas.dialog_button_data = {}
+
+    def pulse_dialog(tag):
+        data = canvas.dialog_button_data.get(tag)
+        if not data: return
+        
+        STEP = 0.002
+        MIN_SCALE = 1.00 
+        MAX_SCALE = 1.05 
+        canvas_ref = canvas
+        
+        if data["hover"]:
+            if data["growing"]:
+                data["scale"] = min(MAX_SCALE, data["scale"] + STEP)
+                if data["scale"] >= MAX_SCALE: data["growing"] = False
+            else:
+                data["scale"] = max(MIN_SCALE, data["scale"] - STEP)
+                if data["scale"] <= MIN_SCALE: data["growing"] = True
+        else:
+            data["scale"] = max(MIN_SCALE, data["scale"] - STEP)
+            
+        if not data["hover"] and data["scale"] == MIN_SCALE:
+            if data["job"]:
+                dialog.after_cancel(data["job"])
+                data["job"] = None
+            new_photo = ImageTk.PhotoImage(data["base_img"])
+            canvas_ref.itemconfig(tag, image=new_photo)
+            data["current_photo"] = new_photo
+            return
+
+        original_w, original_h = data["base_img"].size
+        new_w = int(original_w * data["scale"])
+        new_h = int(original_h * data["scale"])
+        
+        resized_pil = data["base_img"].resize((new_w, new_h), Image.Resampling.BILINEAR)
+        new_photo = ImageTk.PhotoImage(resized_pil)
+        
+        canvas_ref.itemconfig(tag, image=new_photo)
+        data["current_photo"] = new_photo
+        
+        data["job"] = dialog.after(15, lambda: pulse_dialog(tag))
+
+    def dialog_on_enter(event, tag): 
+        dialog.config(cursor="hand2")
+        data = canvas.dialog_button_data.get(tag)
+        if data:
+            data["hover"] = True
+            if data["job"] is None:
+                data["growing"] = True 
+                pulse_dialog(tag)
+
+    def dialog_on_leave(event, tag):
+        dialog.config(cursor="")
+        data = canvas.dialog_button_data.get(tag)
+        if data:
+            data["hover"] = False
+    # --- End Custom Pulse Logic ---
+
 
     # --- Data Setup ---
     has_users = bool(user_data)
@@ -1290,15 +1478,23 @@ def show_user_selection_dialog(user_data):
             play_click_sound() # Play sound before action
             handler(event)
         
-        # Bindings
+        # Setup data for pulse
+        canvas.dialog_button_data[tag] = { 
+            "base_img": img_pil, "scale": 1.0, "growing": True, 
+            "hover": False, "job": None, "current_photo": img_photo 
+        }
+            
+        # Bindings with pulse logic
         if has_users or tag == "create_btn":
             canvas.tag_bind(tag, "<Button-1>", wrapped_dialog_handler)
-            canvas.tag_bind(tag, "<Enter>", lambda e: dialog.config(cursor="hand2"))
-            canvas.tag_bind(tag, "<Leave>", lambda e: dialog.config(cursor=""))
+            canvas.tag_bind(tag, "<Enter>", lambda e: dialog_on_enter(e, tag))
+            canvas.tag_bind(tag, "<Leave>", lambda e: dialog_on_leave(e, tag))
 
     # --- Handlers ---
     def on_load_click(event):
-        if not has_users: return
+        if not has_users: 
+            messagebox.showwarning("No Users", "Please create a user profile first.")
+            return
         username = selected_user_var.get()
         if username in user_data:
             STATE.user_name = username
@@ -1307,7 +1503,9 @@ def show_user_selection_dialog(user_data):
             show_third_frame()
             
     def on_delete_click(event):
-        if not has_users: return
+        if not has_users:
+            messagebox.showwarning("No Users", "There are no users to delete.") 
+            return
         username = selected_user_var.get()
         # Note: messagebox calls don't need the click sound played before them, 
         # as the sound will be played when the user clicks the "Delete" image button.
@@ -1401,14 +1599,32 @@ def on_gender_click(gender):
         STATE.gender_label.place_forget() 
 
 def on_next_char_click(event):
+    # Move the gender check from on_enter to here to allow the pulse animation
+    if STATE.selected_gender is None:
+        messagebox.showwarning("Selection Required", "Please select a gender (Male or Female) before proceeding.")
+        return
     prompt_for_name()
 
+# QoL Addition: Check for assets directory before running
+def check_assets_dir():
+    if not os.path.isdir(ASSETS_DIR):
+        messagebox.showerror(
+            "Fatal Error: Assets Missing", 
+            f"The required assets folder '{ASSETS_DIR}' was not found.\n\nPlease ensure this folder is in the same directory as the script."
+        )
+        return False
+    return True
 
 # =============================
 # RUN
 # =============================
 if __name__ == "__main__":
     
+    if not check_assets_dir():
+        # Exit if assets are missing
+        import sys
+        sys.exit() 
+        
     # Root setup
     root = tk.Tk()
     root.title("Hasa Leveling")
