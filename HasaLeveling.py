@@ -221,9 +221,9 @@ def get_user_progress(username):
     # If DB is down, use safe default values (10%)
     if not conn:
         return {
-            "html_progress": 0.10, "cplusplus_progress": 0.10, 
-            "mysql_progress": 0.10, "python_progress": 0.10, 
-            "java_progress": 0.10, "status": "default_used"
+            "html_progress": 0.00, "cplusplus_progress": 0.00, 
+            "mysql_progress": 0.00, "python_progress": 0.00, 
+            "java_progress": 0.00, "status": "default_used"
         }
 
     try:
