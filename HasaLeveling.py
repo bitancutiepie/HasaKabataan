@@ -24,6 +24,8 @@ APP_ICON_SIZE = 32 # Size for the main app icon
 LANDSCAPE_WIDTH = 1366
 LANDSCAPE_HEIGHT = 768
 
+#note exact ang sukatan natin based on canva so strictly use ang tracking ng x and y
+
 # LANDSCAPE SLIDER CONSTANTS
 LANDSCAPE_SLIDER_WIDTH = 150
 LANDSCAPE_ICON_SIZE = 25
@@ -64,7 +66,7 @@ LANDSCAPE_USERNAME_FONT = ("Arial Black", 16, "bold")
 
 # --- TUTORIAL YOUTUBE LINKS ---
 TUTORIAL_LINKS = {
-    # Replace these with real links once the game is live!
+    
     "Python": {
         1: "https://www.youtube.com/watch?v=UBZs0-gUZsU&list=PLVnJhHoKgEmpbmB-Lrb2m4wwq5IPgLHnG", 
         2: "https://www.youtube.com/watch?v=uVO_bElzTbI&list=PLVnJhHoKgEmpbmB-Lrb2m4wwq5IPgLHnG&index=2",
@@ -119,7 +121,7 @@ PLAY_BUTTONS_CONFIG = [
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",           
-    "password": "jayvee101", # Make sure to use a strong, private password for production!
+    "password": "jayvee101", # pabasa nung setup instructions, make sure na ang pass is same dun sa nakaconfig sa database
     "database": "hasaleveling_db"
 }
 
@@ -179,7 +181,7 @@ class AppState:
 STATE = AppState() # Create the single global state object
 
 # =============================
-# Database Functions - Where we talk to MySQL!
+# Database Functions 
 # =============================
 
 def get_db_connection():
@@ -227,13 +229,13 @@ def get_user_progress(username):
         }
 
     try:
-        cursor = conn.cursor(dictionary=True) # Returns results as a dictionary (super handy!)
+        cursor = conn.cursor(dictionary=True) # 
         query = "SELECT html_progress, cplusplus_progress, mysql_progress, python_progress, java_progress, gender FROM user_progress WHERE username = %s"
         cursor.execute(query, (username.upper(),)) # Names are stored uppercase for consistency
         data = cursor.fetchone()
         
         if data:
-            # Convert progress values (which are strings from DB) to floats
+           
             progress_data = {key: float(value) for key, value in data.items() if key != 'gender'}
             progress_data["status"] = "success"
             STATE.selected_gender = data['gender'] # Update the global gender state
@@ -301,7 +303,7 @@ def insert_new_user(username, gender):
         cursor = conn.cursor()
         insert_query = """
         INSERT INTO user_progress (username, gender, html_progress, cplusplus_progress, mysql_progress, python_progress, java_progress)
-        VALUES (%s, %s, 0.10, 0.10, 0.10, 0.10, 0.10)
+        VALUES (%s, %s, 0.00, 0.00, 0.00, 0.00, 0.00)
         """
         cursor.execute(insert_query, (username.upper(), gender))
         conn.commit()
@@ -369,7 +371,7 @@ def load_pil_image(filename, width, height, mode='RGBA'):
 def draw_skill_progress_bar(canvas, bar_data):
     """
     Draws the segmented progress bar for a skill on the dashboard.
-    It looks super cool because it's not just a single rectangle!
+    Eto yung ginamit para mareplicate yung design sa bar progress
     """
     x, y, w, h = bar_data["x"], bar_data["y"], bar_data["w"], bar_data["h"]
     progress = bar_data["progress"] # A float between 0.0 and 1.0
@@ -451,7 +453,7 @@ def play_click_sound():
             print(f"Error: Click sound file not found at {CLICK_SOUND_PATH}")
 
 # ---------------------------------------------------------
-# ANIMATION & BINDING FUNCTIONS - The magic behind the pulsing buttons!
+# ANIMATION & BINDING FUNCTIONS -
 # ---------------------------------------------------------
 def pulse(tag):
     """
@@ -670,8 +672,7 @@ def create_volume_slider(parent_window, is_portrait):
 def clear_current_frame():
     """
     Cleans up the current screen: stops all pulsing animations,
-    destroys the current canvas, and resets references. Essential before
-    drawing a new screen!
+    destroys the current canvas, and resets references.(more on QOL effects ang laman neto)
     """
     # 1. Stop all current animations
     for data in STATE.button_data.values():
@@ -705,8 +706,7 @@ def on_tutorial_nav_click(event):
 
 def create_nav_buttons(canvas, win):
     """
-    Draws the four main navigation buttons (Home, Tutorial, Problems, Exit)
-    at the bottom of all landscape screens.
+    Navigation Section / NavBar sa baba ng frames
     """
     NAV_BAR_Y_CENTER = 730 
     
