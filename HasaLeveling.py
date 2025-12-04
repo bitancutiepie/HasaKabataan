@@ -194,7 +194,7 @@ def get_db_connection():
         print(error_message)
         # Only show the error once to avoid spamming the user if DB is down
         if STATE.db_progress_data.get("status") != "failed":
-            messagebox.showerror("Database Error", f"Could not connect to MySQL.\nPlease check your DB_CONFIG.\n\nError: {err}")
+            messagebox.showerror("Database Error", f"Could not connect to MySQL.\nPlease check your DB_CONFIG OR Run MYSQL80 in services first.\n\nError: {err}")
             STATE.db_progress_data["status"] = "failed"
         return None
 
