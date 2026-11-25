@@ -1,7 +1,7 @@
 <!-- prettier-ignore -->
 <div align="center">
 
-<img src="assets/logoicon.png" alt="HasaLeveling logo" width="96" />
+<img src="./assets/banner.svg" alt="HasaLeveling Banner" width="100%" />
 
 # HasaLeveling — Gamified Programming Skill Tracker
 

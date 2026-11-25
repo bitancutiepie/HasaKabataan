@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 220" width="100%" height="220">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d081d"/>
+      <stop offset="50%" stop-color="#1a103c"/>
+      <stop offset="100%" stop-color="#090d1e"/>
+    </linearGradient>
+    <linearGradient id="mana" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .title { font: 800 34px 'Segoe UI', system-ui, sans-serif; fill: #faf5ff; letter-spacing: 1.2px; }
+    .sub { font: 500 14px 'Segoe UI', system-ui, sans-serif; fill: #c4b5fd; }
+    .tag { font: 700 11px 'Segoe UI', system-ui, sans-serif; fill: #38bdf8; letter-spacing: 1.2px; }
+    .xp { animation: xp 3s ease-in-out infinite; }
+    .glow { animation: glow 2.2s ease-in-out infinite; }
+    @keyframes xp { 0% { width: 40px; } 50% { width: 170px; } 100% { width: 40px; } }
+    @keyframes glow { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.35; } }
+  </style>
+  <rect width="900" height="220" rx="14" fill="url(#bg)"/>
+  <rect x="2" y="2" width="896" height="216" rx="12" fill="none" stroke="url(#mana)" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- Level Up XP Widget -->
+  <g transform="translate(650, 66)">
+    <rect x="0" y="0" width="200" height="86" rx="10" fill="#130b2b" stroke="#a855f7" stroke-width="1.2"/>
+    <text x="16" y="28" class="tag">SYSTEM QUEST: LEVEL UP</text>
+    <rect x="16" y="42" width="168" height="10" rx="5" fill="#1e1b4b"/>
+    <rect x="16" y="42" width="120" height="10" rx="5" fill="url(#mana)" class="xp"/>
+    <text x="16" y="70" class="sub" style="font-size:11px;">+20% SKILL XP  •  PYTHON • JAVA • C++</text>
+  </g>
+
+  <!-- Floating mana particles -->
+  <circle cx="590" cy="54" r="3" fill="#a855f7" class="glow"/>
+  <circle cx="620" cy="170" r="2.5" fill="#38bdf8" class="glow"/>
+
+  <text x="56" y="72" class="tag">PYTHON  •  TKINTER  •  MYSQL  •  PYGAME</text>
+  <text x="56" y="114" class="title">HASALEVELING</text>
+  <rect x="56" y="128" width="170" height="3" rx="1.5" fill="url(#mana)"/>
+  <text x="56" y="156" class="sub">Hasa Kabataan  •  Gamified Programming Skill Tracker</text>
+</svg>
